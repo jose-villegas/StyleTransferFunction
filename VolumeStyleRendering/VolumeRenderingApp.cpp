@@ -38,7 +38,7 @@ void BasicApp::draw()
         float y = fabs (cos (rel * M_PI + anim)) * height;
         float r = rel * spiralRadius;
         vec3 offset (r * cos (angle), y / 2, r * sin (angle));
-
+        
         gl::pushModelMatrix ();
         gl::translate (offset);
         gl::scale (vec3 (0.05f, y, 0.05f));
