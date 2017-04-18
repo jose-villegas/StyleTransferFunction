@@ -21,8 +21,9 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{8AD996D0-9B41-4AF1-8368-92ABD6621F40}</ProjectGuid>
-    <RootNamespace>VolumeStylisticRendering</RootNamespace>
+    <RootNamespace>VolumeStyleRendering</RootNamespace>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <ProjectName>VolumeStyleRendering</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
