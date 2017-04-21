@@ -5,6 +5,7 @@ class Volume3D
 {
 public:
     void createFromFile(const glm::vec3& dimensions, const std::string filepath);
+    void drawFrontCubeFace() const;
     explicit Volume3D();
     ~Volume3D();
 private:

@@ -18,6 +18,8 @@ public:
     void mouseDown(MouseEvent event) override;
 private:
     Volume3D volume;
+    CameraPersp camera;
+    gl::GlslProgRef positionsShader;
 };
 
 void VolumeRenderingApp::prepareSettings(Settings* settings)
@@ -30,6 +32,28 @@ void VolumeRenderingApp::setup()
     auto options = ImGui::Options();
     options.font("fonts/DroidSans.ttf", 16);
     ui::initialize(options);
+    // create positions shader
+    positionsShader = gl::GlslProg::create(gl::GlslProg::Format()
+        .vertex(CI_GLSL(400,
+            uniform mat4 ciModelViewProjection;
+            layout(location = 0) in vec3 position;
+            out vec3 Color;
+
+            void main(void)
+            {
+                gl_Position = ciModelViewProjection * vec4(position, 1);
+                Color = position;
+            }
+        ))
+        .fragment(CI_GLSL(400,
+            in vec3 Color;
+            out vec4 fragmentColor;
+
+            void main(void)
+            {
+                fragmentColor = vec4(Color, 1);
+            }
+        )));
 }
 
 void VolumeRenderingApp::update()
@@ -92,6 +116,14 @@ void VolumeRenderingApp::update()
 void VolumeRenderingApp::draw()
 {
     gl::clear();
+    gl::bindBuffer(GL_DRAW_FRAMEBUFFER, 0);
+    camera.lookAt(vec3(3, 2, 4), vec3(0));
+    gl::setMatrices(camera);
+    // activate position shader
+    positionsShader->bind();
+    gl::setDefaultShaderVars();
+    // draw cube front faces
+    volume.drawFrontCubeFace();
 }
 
 void VolumeRenderingApp::mouseDown(MouseEvent event) {}

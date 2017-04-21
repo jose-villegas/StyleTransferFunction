@@ -50,11 +50,9 @@ void Volume3D::createCubeVbo()
     vertexArrayObject->bind();
     // vertex attributes locations
     gl::enableVertexAttribArray(0);
-    gl::enableVertexAttribArray(1);
     // bind and link data
     verticesBuffer->bind();
     gl::vertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, static_cast<GLfloat *>(nullptr));
-    gl::vertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, static_cast<GLfloat *>(nullptr));
     indicesBuffer->bind();
 }
 
@@ -145,4 +143,15 @@ void Volume3D::createFromFile(const vec3& dimensions, const std::string filepath
     createVolumeTexture(dimensions, filepath);
     // create frame buffer object
     createFbos();
+}
+
+void Volume3D::drawFrontCubeFace() const
+{
+    if (!vertexArrayObject) return;
+
+    gl::enable(GL_CULL_FACE, true);
+    gl::cullFace(GL_BACK);
+    vertexArrayObject->bind();
+    gl::drawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, (GLuint *)nullptr);
+    gl::disable(GL_CULL_FACE);
 }
