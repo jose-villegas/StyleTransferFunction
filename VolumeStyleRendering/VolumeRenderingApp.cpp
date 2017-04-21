@@ -2,50 +2,98 @@
 #include "cinder/app/RendererGl.h"
 #include "cinder/gl/gl.h"
 
+#include "CinderImGui.h"
+#include "Volume3D.h"
+
 using namespace ci;
 using namespace app;
 
-class BasicApp : public App
+class VolumeRenderingApp : public App
 {
 public:
+    static void prepareSettings(Settings* settings);
+    void setup() override;
+    void update() override;
     void draw() override;
+    void mouseDown(MouseEvent event) override;
+private:
+    Volume3D volume;
 };
 
-void BasicApp::draw()
+void VolumeRenderingApp::prepareSettings(Settings* settings)
 {
-    gl::clear ();
-    gl::enableDepthRead ();
-    gl::enableDepthWrite ();
-
-    CameraPersp cam;
-    cam.lookAt (vec3 (3, 4.5, 4.5), vec3 (0, 1, 0));
-    gl::setMatrices (cam);
-
-    auto lambert = gl::ShaderDef ().lambert ().color ();
-    auto shader = gl::getStockShader (lambert);
-    shader->bind ();
-
-    int numSpheres = 64;
-    float maxAngle = M_PI * 7;
-    float spiralRadius = 1;
-    float height = 2;
-    float anim = getElapsedFrames () / 30.0f;
-
-    for (int s = 0; s < numSpheres; ++s)
-    {
-        float rel = s / (float)numSpheres;
-        float angle = rel * maxAngle;
-        float y = fabs (cos (rel * M_PI + anim)) * height;
-        float r = rel * spiralRadius;
-        vec3 offset (r * cos (angle), y / 2, r * sin (angle));
-        
-        gl::pushModelMatrix ();
-        gl::translate (offset);
-        gl::scale (vec3 (0.05f, y, 0.05f));
-        gl::color (Color (CM_HSV, rel, 1, 1));
-        gl::drawCube (vec3 (), vec3 (1));
-        gl::popModelMatrix ();
-    }
+    settings->setWindowSize(800, 600);
 }
 
-CINDER_APP (BasicApp, RendererGl)
+void VolumeRenderingApp::setup()
+{
+    auto options = ImGui::Options();
+    options.font("fonts/DroidSans.ttf", 16);
+    ui::initialize(options);
+}
+
+void VolumeRenderingApp::update()
+{
+    static bool loadNewVolume = false;
+    static ivec3 slices = ivec3(1);
+    static fs::path path;
+    static int bits = 0;
+    // menu bar on top
+    ui::ScopedMainMenuBar menuBar;
+
+    if (ui::BeginMenu("File"))
+    {
+        if (ui::MenuItem("Open"))
+        {
+            path = getOpenFilePath(path, {"raw"});
+
+            if (!path.empty())
+            {
+                loadNewVolume = true;
+            }
+        }
+        ui::EndMenu();
+    }
+
+    // ui::ShowTestWindow();
+
+    // open modal dialog for volume parameters
+    if (loadNewVolume)
+    {
+        ui::OpenPopup("Volume Parameters");
+    }
+
+    if (ui::BeginPopupModal("Volume Parameters", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        // volume dimensions
+        ui::InputInt3("Slices", value_ptr(slices));
+        // node bit size
+        ui::RadioButton("8 bits", &bits, 0);
+        ui::SameLine();
+        ui::Dummy(ImVec2(ui::GetContentRegionAvailWidth() / 3, 0));
+        ui::SameLine();
+        ui::RadioButton("16 bits", &bits, 1);
+
+        if (ui::Button("Load", ImVec2(ui::GetContentRegionAvailWidth(), 0)))
+        {
+            volume.createFromFile(slices, path.string());
+            ui::CloseCurrentPopup();
+        }
+
+        ui::EndPopup();
+    }
+
+    // refresh flags
+    loadNewVolume = false;
+    // slices has to be positive
+    slices = max(slices, ivec3(1));
+}
+
+void VolumeRenderingApp::draw()
+{
+    gl::clear();
+}
+
+void VolumeRenderingApp::mouseDown(MouseEvent event) {}
+
+CINDER_APP (VolumeRenderingApp, RendererGl, &VolumeRenderingApp::prepareSettings)
