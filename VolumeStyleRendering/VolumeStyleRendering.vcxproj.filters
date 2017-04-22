@@ -39,4 +39,10 @@
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\positions.vert" />
+    <None Include="shaders\positions.frag" />
+    <None Include="shaders\raycast.vert" />
+    <None Include="shaders\raycast.frag" />
+  </ItemGroup>
 </Project>

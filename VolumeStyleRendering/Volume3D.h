@@ -4,8 +4,10 @@
 class Volume3D
 {
 public:
-    void createFromFile(const glm::vec3& dimensions, const std::string filepath);
+    void createFromFile(const glm::vec3& dimensions, const std::string filepath, bool is16Bits = false  );
     void drawFrontCubeFace() const;
+    void drawBackCubeFace() const;
+    void drawVolume() const;
     explicit Volume3D();
     ~Volume3D();
 private:
@@ -21,8 +23,19 @@ private:
     // back cube fbo
     ci::gl::FboRef backFbo;
     ci::gl::RenderbufferRef backDepth;
+    // draw positions shader
+    cinder::gl::GlslProgRef positionsShader;
+    // volume raycast
+    cinder::gl::GlslProgRef raycastShader;
+    // raycast parameters
+    glm::vec3 stepSize;
+    float maxSize;
+    float stepScale;
+
+    bool isDrawable;
 
     void createCubeVbo();
-    void createVolumeTexture(const glm::vec3& dimensions, const std::string filepath);
+    void readVolumeFromFile8(const glm::vec3& dimensions, const std::string filepath);
+    void readVolumeFromFile16(const glm::vec3& dimensions, const std::string filepath);
     void createFbos();
 };

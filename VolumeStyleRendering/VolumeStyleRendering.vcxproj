@@ -146,6 +146,12 @@
   <ItemGroup>
     <ClInclude Include="Volume3D.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\positions.frag" />
+    <None Include="shaders\positions.vert" />
+    <None Include="shaders\raycast.frag" />
+    <None Include="shaders\raycast.vert" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
