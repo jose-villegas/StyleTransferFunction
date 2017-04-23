@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26403.0
+VisualStudioVersion = 15.0.26403.7
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "VolumeStyleRendering", "VolumeStyleRendering\VolumeStyleRendering.vcxproj", "{8AD996D0-9B41-4AF1-8368-92ABD6621F40}"
 EndProject

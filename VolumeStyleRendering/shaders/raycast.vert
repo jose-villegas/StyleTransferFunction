@@ -1,10 +1,11 @@
 #version 400
 uniform mat4 ciModelViewProjection;
-layout(location = 0) in vec3 position;
-out vec4 pos;
+uniform vec3 scaleFactor;
+layout(location = 0) in vec3 v_position;
+out vec4 position;
 
 void main(void)
 {
-    gl_Position = ciModelViewProjection * vec4(position, 1);
-    pos = gl_Position;
+    gl_Position = ciModelViewProjection * vec4(v_position * scaleFactor, 1);
+    position = gl_Position;
 }

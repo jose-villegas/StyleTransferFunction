@@ -5,7 +5,7 @@
 using namespace ci;
 using namespace glm;
 
-Volume3D::Volume3D() : stepScale(1)
+Volume3D::Volume3D() : ratios(1), stepScale(1)
 {
     // positions shader
     positionsShader = gl::GlslProg::create(gl::GlslProg::Format()
@@ -145,7 +145,7 @@ void Volume3D::createFbos()
                                              .wrapT(GL_REPEAT)
                                              .minFilter(GL_NEAREST)
                                              .magFilter(GL_NEAREST)
-                                             .internalFormat(GL_RGBA32F)
+                                             .internalFormat(GL_RGBA16F)
                                              .dataType(GL_FLOAT));
     format.depthBuffer(GL_DEPTH_COMPONENT16);
 
@@ -164,7 +164,7 @@ void Volume3D::createFbos()
     CI_CHECK_GL();
 }
 
-void Volume3D::createFromFile(const vec3& dimensions, const std::string filepath, bool is16Bits)
+void Volume3D::createFromFile(const vec3& dimensions, const vec3& ratios, const std::string filepath, bool is16Bits)
 {
     // create volume texture
     is16Bits ? readVolumeFromFile16(dimensions, filepath) : readVolumeFromFile8(dimensions, filepath);
@@ -173,6 +173,8 @@ void Volume3D::createFromFile(const vec3& dimensions, const std::string filepath
     stepSize = vec3(1.0f / (dimensions.x * (maxSize / dimensions.x)),
                     1.0f / (dimensions.y * (maxSize / dimensions.y)),
                     1.0f / (dimensions.z * (maxSize / dimensions.z)));
+    this->ratios = ratios;
+    this->dimensions = dimensions;
 }
 
 void Volume3D::drawFrontCubeFace() const
@@ -182,7 +184,7 @@ void Volume3D::drawFrontCubeFace() const
     gl::enable(GL_CULL_FACE, true);
     gl::cullFace(GL_BACK);
     vertexArrayObject->bind();
-    gl::drawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, (GLuint *)nullptr);
+    gl::drawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, static_cast<GLuint *>(nullptr));
     gl::disable(GL_CULL_FACE);
 }
 
@@ -193,7 +195,7 @@ void Volume3D::drawBackCubeFace() const
     gl::enable(GL_CULL_FACE, true);
     gl::cullFace(GL_FRONT);
     vertexArrayObject->bind();
-    gl::drawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, (GLuint *)nullptr);
+    gl::drawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, static_cast<GLuint *>(nullptr));
     gl::disable(GL_CULL_FACE);
 }
 
@@ -201,10 +203,13 @@ void Volume3D::drawVolume() const
 {
     if (!isDrawable) return;
 
+    // volume scale
+    auto scaleFactor = vec3(1) / ((vec3(1) * maxSize) / (dimensions * ratios));
     // draw front face cube positions to render target
     frontFbo->bindFramebuffer(GL_DRAW_FRAMEBUFFER);
     gl::clear();
     positionsShader->bind();
+    positionsShader->uniform("scaleFactor", scaleFactor);
     gl::setDefaultShaderVars();
     drawFrontCubeFace();
     frontFbo->unbindFramebuffer();
@@ -216,14 +221,24 @@ void Volume3D::drawVolume() const
     // raycast volume
     gl::clear();
     raycastShader->bind();
+    // scale volume
     gl::setDefaultShaderVars();
+    // bind front and back cube textures
     frontFbo->getTexture2d(GL_COLOR_ATTACHMENT0)->bind(0);
     raycastShader->uniform("cubeFront", 0);
     backFbo->getTexture2d(GL_COLOR_ATTACHMENT0)->bind(1);
     raycastShader->uniform("cubeBack", 1);
+    // bind volume data texture
     volumeTexture->bind(2);
     raycastShader->uniform("volume", 2);
+    // raycast parameters
+    raycastShader->uniform("scaleFactor", scaleFactor);
     raycastShader->uniform("stepSize", stepSize * stepScale);
     raycastShader->uniform("iterations", static_cast<int>(maxSize * (1.0f / stepScale) * 2.0f));
-    drawFrontCubeFace();
+    // draw cube
+    {
+        gl::ScopedBlend blend(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        vertexArrayObject->bind();
+        gl::drawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, static_cast<GLuint *>(nullptr));
+    }
 }

@@ -31,32 +31,42 @@ void VolumeRenderingApp::setup()
     auto options = ImGui::Options();
     options.font("fonts/DroidSans.ttf", 16);
     ui::initialize(options);
+
+    // camera initial position
+    camera.lookAt(vec3(2, 1, 3), vec3(0));
 }
 
 void VolumeRenderingApp::update()
 {
-    static bool loadNewVolume = false;
     static ivec3 slices = ivec3(1);
+    static bool loadNewVolume = false;
     static fs::path path;
-    static int bits = 0;
+    static bool showRendering = false;
+
     // menu bar on top
-    ui::ScopedMainMenuBar menuBar;
-
-    if (ui::BeginMenu("File"))
     {
-        if (ui::MenuItem("Open"))
+        ui::ScopedMainMenuBar menuBar;
+
+        if (ui::BeginMenu("File"))
         {
-            path = getOpenFilePath(path, {"raw"});
-
-            if (!path.empty())
+            if (ui::MenuItem("Open"))
             {
-                loadNewVolume = true;
-            }
-        }
-        ui::EndMenu();
-    }
+                path = getOpenFilePath(path, {"raw"});
 
-    // ui::ShowTestWindow();
+                if (!path.empty())
+                {
+                    loadNewVolume = true;
+                }
+            }
+            ui::EndMenu();
+        }
+
+        if (ui::BeginMenu("Volume"))
+        {
+            ui::MenuItem("Rendering", nullptr, &showRendering);
+            ui::EndMenu();
+        }
+    }
 
     // open modal dialog for volume parameters
     if (loadNewVolume)
@@ -66,8 +76,12 @@ void VolumeRenderingApp::update()
 
     if (ui::BeginPopupModal("Volume Parameters", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
     {
+        static vec3 ratios = vec3(1);
+        static int bits = 0;
         // volume dimensions
         ui::InputInt3("Slices", value_ptr(slices));
+        // volume ratios
+        ui::InputFloat3("Aspect", value_ptr(ratios));
         // node bit size
         ui::RadioButton("8 bits", &bits, 0);
         ui::SameLine();
@@ -77,11 +91,22 @@ void VolumeRenderingApp::update()
 
         if (ui::Button("Load", ImVec2(ui::GetContentRegionAvailWidth(), 0)))
         {
-            volume.createFromFile(slices, path.string(), bits == 1);
+            volume.createFromFile(slices, ratios, path.string(), bits == 1);
             ui::CloseCurrentPopup();
         }
 
         ui::EndPopup();
+    }
+    // volume controls
+    if(showRendering){
+        if (!ui::Begin("Rendering", &showRendering))
+        {
+            ui::End();
+        }
+
+        ui::InputFloat("Step Scale", &volume.stepScale);
+        ui::InputFloat3("Aspect", value_ptr(volume.ratios));
+        ui::End();
     }
 
     // refresh flags
@@ -93,7 +118,6 @@ void VolumeRenderingApp::update()
 void VolumeRenderingApp::draw()
 {
     gl::clear();
-    camera.lookAt(vec3(3, 2, 4), vec3(0));
     gl::setMatrices(camera);
     // draw volumetric data
     volume.drawVolume();

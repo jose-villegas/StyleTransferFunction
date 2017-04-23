@@ -1,10 +1,15 @@
 #pragma once
 #include "cinder/gl/gl.h"
+#include <glm/detail/type_mat.hpp>
+#include <glm/detail/type_mat.hpp>
 
 class Volume3D
 {
 public:
-    void createFromFile(const glm::vec3& dimensions, const std::string filepath, bool is16Bits = false  );
+    glm::vec3 ratios;
+    float stepScale;
+
+    void createFromFile(const glm::vec3& dimensions, const glm::vec3& ratios, const std::string filepath, bool is16Bits = false);
     void drawFrontCubeFace() const;
     void drawBackCubeFace() const;
     void drawVolume() const;
@@ -28,9 +33,9 @@ private:
     // volume raycast
     cinder::gl::GlslProgRef raycastShader;
     // raycast parameters
+    glm::vec3 dimensions;
     glm::vec3 stepSize;
     float maxSize;
-    float stepScale;
 
     bool isDrawable;
 
