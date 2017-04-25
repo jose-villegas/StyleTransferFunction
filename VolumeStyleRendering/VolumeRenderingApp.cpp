@@ -4,6 +4,7 @@
 
 #include "CinderImGui.h"
 #include "Volume3D.h"
+#include <cinder/Log.h>
 
 using namespace ci;
 using namespace app;
@@ -13,17 +14,26 @@ class VolumeRenderingApp : public App
 public:
     static void prepareSettings(Settings* settings);
     void setup() override;
+    void drawUi();
     void update() override;
     void draw() override;
+    void mouseWheel(MouseEvent event) override;
+    void mouseDrag(MouseEvent event) override;
     void mouseDown(MouseEvent event) override;
 private:
+    vec2 dragStart;
     Volume3D volume;
     CameraPersp camera;
+    CameraPersp initialCamera;
+    float dragPivotDistance;
 };
 
 void VolumeRenderingApp::prepareSettings(Settings* settings)
 {
-    settings->setWindowSize(800, 600);
+    settings->setResizable(false);
+    settings->setWindowSize(1280, 720);
+    // logging
+    log::makeLogger<log::LoggerFile>("log.txt");
 }
 
 void VolumeRenderingApp::setup()
@@ -31,12 +41,9 @@ void VolumeRenderingApp::setup()
     auto options = ImGui::Options();
     options.font("fonts/DroidSans.ttf", 16);
     ui::initialize(options);
-
-    // camera initial position
-    camera.lookAt(vec3(2, 1, 3), vec3(0));
 }
 
-void VolumeRenderingApp::update()
+void VolumeRenderingApp::drawUi()
 {
     static ivec3 slices = ivec3(1);
     static bool loadNewVolume = false;
@@ -80,7 +87,7 @@ void VolumeRenderingApp::update()
         static int bits = 0;
         // volume dimensions
         ui::InputInt3("Slices", value_ptr(slices));
-        // volume ratios
+        // volume aspectRatios
         ui::InputFloat3("Aspect", value_ptr(ratios));
         // node bit size
         ui::RadioButton("8 bits", &bits, 0);
@@ -92,20 +99,39 @@ void VolumeRenderingApp::update()
         if (ui::Button("Load", ImVec2(ui::GetContentRegionAvailWidth(), 0)))
         {
             volume.createFromFile(slices, ratios, path.string(), bits == 1);
+            // position camera looking at volume
+            camera.setEyePoint(volume.centerPoint() + vec3(0, 0, 2));
+            camera.lookAt(volume.centerPoint());
+            camera.setPivotDistance(2);
             ui::CloseCurrentPopup();
         }
 
         ui::EndPopup();
     }
     // volume controls
-    if(showRendering){
+    if (showRendering)
+    {
+        static float stepScale = volume.getStepScale();
+        static vec3 aspectRatios = volume.getAspectRatios();
+
         if (!ui::Begin("Rendering", &showRendering))
         {
             ui::End();
         }
 
-        ui::InputFloat("Step Scale", &volume.stepScale);
-        ui::InputFloat3("Aspect", value_ptr(volume.ratios));
+        stepScale = volume.getStepScale();
+        aspectRatios = volume.getAspectRatios();
+
+        if (ui::InputFloat("Step Scale", &stepScale))
+        {
+            volume.setStepScale(stepScale);
+        }
+
+        if (ui::InputFloat3("Aspect", value_ptr(aspectRatios)))
+        {
+            volume.setAspectratios(aspectRatios);
+        }
+
         ui::End();
     }
 
@@ -113,6 +139,11 @@ void VolumeRenderingApp::update()
     loadNewVolume = false;
     // slices has to be positive
     slices = max(slices, ivec3(1));
+}
+
+void VolumeRenderingApp::update()
+{
+    drawUi();
 }
 
 void VolumeRenderingApp::draw()
@@ -123,6 +154,52 @@ void VolumeRenderingApp::draw()
     volume.drawVolume();
 }
 
-void VolumeRenderingApp::mouseDown(MouseEvent event) {}
+void VolumeRenderingApp::mouseWheel(MouseEvent event)
+{
+    float increment = event.getWheelIncrement();
+    float multiplier = powf(1.2, increment);
+    // move camera
+    vec3 translate = camera.getViewDirection() * (camera.getPivotDistance() * (1.0f - multiplier));
+    camera.setEyePoint(camera.getEyePoint() + translate);
+    camera.setPivotDistance(camera.getPivotDistance() * multiplier);
+}
+
+void VolumeRenderingApp::mouseDrag(MouseEvent event)
+{
+    if (event.isLeftDown())
+    {
+        vec2 dragCurrent = event.getPos();
+        float deltaX = (dragCurrent.x - dragStart.x) / -100.0f;
+        float deltaY = (dragCurrent.y - dragStart.y) / 100.0f;
+        vec3 viewDirection = normalize(initialCamera.getViewDirection());
+        bool invertMotion = (initialCamera.getOrientation() * initialCamera.getWorldUp()).y < 0.0f;
+
+        vec3 rightDirection = normalize(cross(initialCamera.getWorldUp(), viewDirection));
+
+        if (invertMotion)
+        {
+            deltaX = -deltaX;
+            deltaY = -deltaY;
+        }
+
+        console() << deltaX << ", " << deltaY << std::endl;
+
+        vec3 rotated = angleAxis(deltaY, rightDirection) * (-initialCamera.getViewDirection() * dragPivotDistance);
+        rotated = angleAxis(deltaX, initialCamera.getWorldUp()) * rotated;
+
+        // camera.setEyePoint(initialCamera.getEyePoint() + initialCamera.getViewDirection() * dragPivotDistance * rotated);
+        auto rotation = angleAxis(deltaX, initialCamera.getWorldUp()) * angleAxis(deltaY, rightDirection) * initialCamera.getOrientation();
+    }
+}
+
+void VolumeRenderingApp::mouseDown(MouseEvent event)
+{
+    if (event.isLeftDown())
+    {
+        dragStart = event.getPos();
+        initialCamera = camera;
+        dragPivotDistance = camera.getPivotDistance();
+    }
+}
 
 CINDER_APP (VolumeRenderingApp, RendererGl, &VolumeRenderingApp::prepareSettings)

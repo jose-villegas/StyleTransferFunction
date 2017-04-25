@@ -6,15 +6,18 @@
 class Volume3D
 {
 public:
-    glm::vec3 ratios;
-    float stepScale;
-
     void createFromFile(const glm::vec3& dimensions, const glm::vec3& ratios, const std::string filepath, bool is16Bits = false);
     void drawFrontCubeFace() const;
     void drawBackCubeFace() const;
     void drawVolume() const;
     explicit Volume3D();
     ~Volume3D();
+    // getters and setters
+    const glm::vec3 centerPoint() const;
+    const float &getStepScale() const;
+    void setStepScale(const float& value);
+    const glm::vec3 &getAspectRatios() const;
+    void setAspectratios(const glm::vec3& value);
 private:
     // cube for positions
     ci::gl::BufferObjRef verticesBuffer;
@@ -35,12 +38,15 @@ private:
     // raycast parameters
     glm::vec3 dimensions;
     glm::vec3 stepSize;
+    glm::vec3 aspectRatios;
+    glm::vec3 scaleFactor;
+    float stepScale;
     float maxSize;
 
     bool isDrawable;
 
     void createCubeVbo();
+    void createFbos();
     void readVolumeFromFile8(const glm::vec3& dimensions, const std::string filepath);
     void readVolumeFromFile16(const glm::vec3& dimensions, const std::string filepath);
-    void createFbos();
 };

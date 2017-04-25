@@ -5,7 +5,7 @@
 using namespace ci;
 using namespace glm;
 
-Volume3D::Volume3D() : ratios(1), stepScale(1)
+Volume3D::Volume3D() : aspectRatios(1), scaleFactor(vec3(1)), stepScale(1)
 {
     // positions shader
     positionsShader = gl::GlslProg::create(gl::GlslProg::Format()
@@ -24,11 +24,35 @@ Volume3D::Volume3D() : ratios(1), stepScale(1)
 
 Volume3D::~Volume3D() {}
 
+const vec3 Volume3D::centerPoint() const
+{
+    return vec3(0.5) * scaleFactor;
+}
+
+const float &Volume3D::getStepScale() const
+{
+    return stepScale;
+}
+
+void Volume3D::setStepScale(const float& value)
+{
+    stepScale = max(value, 0.01f);
+}
+
+const vec3 &Volume3D::getAspectRatios() const
+{
+    return aspectRatios;
+}
+
+void Volume3D::setAspectratios(const vec3& value)
+{
+    aspectRatios = max(value, vec3(0));
+    // volume scale
+    scaleFactor = vec3(1) / ((vec3(1) * maxSize) / (dimensions * aspectRatios));
+}
+
 void Volume3D::createCubeVbo()
 {
-    // object already created
-    if (isDrawable) return;
-
     GLfloat vertices[24] =
     {
         0.0f, 0.0f, 0.0f,
@@ -137,9 +161,6 @@ void Volume3D::readVolumeFromFile16(const vec3& dimensions, const std::string fi
 
 void Volume3D::createFbos()
 {
-    // render targets already created
-    if (isDrawable) return;
-
     gl::Fbo::Format format = gl::Fbo::Format();
     format.colorTexture(gl::Texture::Format().wrapS(GL_REPEAT)
                                              .wrapT(GL_REPEAT)
@@ -173,8 +194,8 @@ void Volume3D::createFromFile(const vec3& dimensions, const vec3& ratios, const 
     stepSize = vec3(1.0f / (dimensions.x * (maxSize / dimensions.x)),
                     1.0f / (dimensions.y * (maxSize / dimensions.y)),
                     1.0f / (dimensions.z * (maxSize / dimensions.z)));
-    this->ratios = ratios;
     this->dimensions = dimensions;
+    setAspectratios(ratios);
 }
 
 void Volume3D::drawFrontCubeFace() const
@@ -203,8 +224,6 @@ void Volume3D::drawVolume() const
 {
     if (!isDrawable) return;
 
-    // volume scale
-    auto scaleFactor = vec3(1) / ((vec3(1) * maxSize) / (dimensions * ratios));
     // draw front face cube positions to render target
     frontFbo->bindFramebuffer(GL_DRAW_FRAMEBUFFER);
     gl::clear();
