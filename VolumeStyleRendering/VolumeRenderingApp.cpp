@@ -103,6 +103,7 @@ void VolumeRenderingApp::drawUi()
             camera.setEyePoint(volume.centerPoint() + vec3(0, 0, 2));
             camera.lookAt(volume.centerPoint());
             camera.setPivotDistance(2);
+
             ui::CloseCurrentPopup();
         }
 
@@ -130,6 +131,12 @@ void VolumeRenderingApp::drawUi()
         if (ui::InputFloat3("Aspect", value_ptr(aspectRatios)))
         {
             volume.setAspectratios(aspectRatios);
+            // update camera
+            auto eye = volume.centerPoint() + camera.getViewDirection() * camera.getPivotDistance();
+            camera.setEyePoint(eye);
+            camera.lookAt(eye, volume.centerPoint(), camera.getWorldUp());
+            dragStart = vec2(0);
+            initialCamera = camera;
         }
 
         ui::End();
@@ -187,8 +194,8 @@ void VolumeRenderingApp::mouseDrag(MouseEvent event)
         vec3 rotated = angleAxis(deltaY, rightDirection) * (-initialCamera.getViewDirection() * dragPivotDistance);
         rotated = angleAxis(deltaX, initialCamera.getWorldUp()) * rotated;
 
-        // camera.setEyePoint(initialCamera.getEyePoint() + initialCamera.getViewDirection() * dragPivotDistance * rotated);
-        auto rotation = angleAxis(deltaX, initialCamera.getWorldUp()) * angleAxis(deltaY, rightDirection) * initialCamera.getOrientation();
+        camera.setEyePoint(initialCamera.getEyePoint() + initialCamera.getViewDirection() * dragPivotDistance + rotated);
+        camera.setOrientation(angleAxis(deltaX, initialCamera.getWorldUp()) * angleAxis(deltaY, rightDirection) * initialCamera.getOrientation());
     }
 }
 
