@@ -5,6 +5,7 @@
 #include "CinderImGui.h"
 #include "Volume3D.h"
 #include <cinder/Log.h>
+#include "TransferFunction.h"
 
 using namespace ci;
 using namespace app;
@@ -23,6 +24,7 @@ public:
 private:
     vec2 dragStart;
     Volume3D volume;
+    TransferFunction transferFunction;
     CameraPersp camera;
     CameraPersp initialCamera;
     float dragPivotDistance;
@@ -49,6 +51,7 @@ void VolumeRenderingApp::drawUi()
     static bool loadNewVolume = false;
     static fs::path path;
     static bool showRendering = false;
+    static bool showTransferFunction;
 
     // menu bar on top
     {
@@ -71,6 +74,7 @@ void VolumeRenderingApp::drawUi()
         if (ui::BeginMenu("Volume"))
         {
             ui::MenuItem("Rendering", nullptr, &showRendering);
+            ui::MenuItem("Transfer Function", nullptr, &showTransferFunction);
             ui::EndMenu();
         }
     }
@@ -141,6 +145,11 @@ void VolumeRenderingApp::drawUi()
 
         ui::End();
     }
+    // transfer function ui
+    if (showTransferFunction)
+    {
+        transferFunction.drawUi(showTransferFunction);
+    }
 
     // refresh flags
     loadNewVolume = false;
@@ -164,7 +173,7 @@ void VolumeRenderingApp::draw()
 void VolumeRenderingApp::mouseWheel(MouseEvent event)
 {
     float increment = event.getWheelIncrement();
-    float multiplier = powf(1.2, increment);
+    float multiplier = powf(1.2f, increment);
     // move camera
     vec3 translate = camera.getViewDirection() * (camera.getPivotDistance() * (1.0f - multiplier));
     camera.setEyePoint(camera.getEyePoint() + translate);

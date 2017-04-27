@@ -15,6 +15,9 @@ Volume3D::Volume3D() : aspectRatios(1), scaleFactor(vec3(1)), stepScale(1)
     raycastShader = gl::GlslProg::create(gl::GlslProg::Format()
         .vertex(loadFile("shaders/raycast.vert"))
         .fragment(loadFile("shaders/raycast.frag")));
+    // histogram calculation 
+    histogramCompute = gl::GlslProg::create(gl::GlslProg::Format()
+        .compute(loadFile("shaders/histogram.comp")));
 
     // create clockwise bbox for volume rendering
     createCubeVbo();
@@ -111,6 +114,7 @@ void Volume3D::readVolumeFromFile8(const vec3& dimensions, const std::string fil
 
     if (file.read(reinterpret_cast<char*>(buffer.data()), size))
     {
+
         // create 3D texture
         auto format = gl::Texture3d::Format().magFilter(GL_LINEAR)
                                              .minFilter(GL_LINEAR)
@@ -118,10 +122,12 @@ void Volume3D::readVolumeFromFile8(const vec3& dimensions, const std::string fil
                                              .wrapR(GL_CLAMP_TO_EDGE)
                                              .wrapT(GL_CLAMP_TO_EDGE);
         format.setDataType(GL_UNSIGNED_BYTE);
-        format.setInternalFormat(GL_R8);
+        format.setInternalFormat(GL_RED);
         volumeTexture = gl::Texture3d::create(buffer.data(), GL_RED, dimensions.x, dimensions.y, dimensions.z, format);
         // finally has drawable data
         isDrawable = true;
+
+        extractHistogram(buffer);
     }
 
     file.close();
@@ -150,10 +156,12 @@ void Volume3D::readVolumeFromFile16(const vec3& dimensions, const std::string fi
                                              .wrapR(GL_CLAMP_TO_EDGE)
                                              .wrapT(GL_CLAMP_TO_EDGE);
         format.setDataType(GL_UNSIGNED_SHORT);
-        format.setInternalFormat(GL_R16);
+        format.setInternalFormat(GL_RED);
         volumeTexture = gl::Texture3d::create(buffer.data(), GL_RED, dimensions.x, dimensions.y, dimensions.z, format);
         // finally has drawable data
         isDrawable = true;
+
+        extractHistogram(buffer);
     }
 
     file.close();
@@ -260,4 +268,44 @@ void Volume3D::drawVolume() const
         vertexArrayObject->bind();
         gl::drawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, static_cast<GLuint *>(nullptr));
     }
+
+    histogramCompute->bind();
+
+    glBindImageTexture(0, volumeTexture->getId(), 0, true, 0, GL_READ_ONLY, GL_R8UI);
+    glBindImageTexture(1, histogramTexture->getId(), 0, false, 0, GL_READ_WRITE, GL_R32UI);
+
+    gl::dispatchCompute(ceil(dimensions.x / 8), ceil(dimensions.y / 8), ceil(dimensions.z / 4));
+    gl::memoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+}
+
+template<typename T, typename>
+void Volume3D::extractHistogram(std::vector<T> volume)
+{
+    std::vector<uint32_t> histogramData(256);
+    fill(histogramData.begin(), histogramData.end(), 0);
+    // create 3D texture
+    auto format = gl::Texture1d::Format().magFilter(GL_LINEAR)
+                                         .minFilter(GL_LINEAR)
+                                         .wrapS(GL_CLAMP_TO_EDGE);
+    format.setDataType(GL_UNSIGNED_INT);
+    format.setInternalFormat(GL_R32UI);
+    histogramTexture = gl::Texture1d::create(histogramData.data(), GL_RED_INTEGER, 256, format);
+
+    return;
+
+    int limit = static_cast<float>(std::numeric_limits<T>().max());
+    float maxOccurrence = 0;
+    histogram = std::vector<float>(limit + 1);
+    fill(histogram.begin(), histogram.end(), 0.0f);
+
+    // fill histogram with ocurrences per opacity
+    for (auto& val : volume)
+    {
+        int value = static_cast<int>(val);
+        histogram[value] = histogram[value] + 1.0f;
+        maxOccurrence = max(maxOccurrence, histogram[value]);
+    }
+
+    // normalize values
+    std::for_each(histogram.begin(), histogram.end(), [=](float& val) { val = val / maxOccurrence; });
 }

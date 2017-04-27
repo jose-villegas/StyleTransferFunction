@@ -1,7 +1,5 @@
 #pragma once
 #include "cinder/gl/gl.h"
-#include <glm/detail/type_mat.hpp>
-#include <glm/detail/type_mat.hpp>
 
 class Volume3D
 {
@@ -19,6 +17,8 @@ public:
     const glm::vec3 &getAspectRatios() const;
     void setAspectratios(const glm::vec3& value);
 private:
+    // histogram data
+    std::vector<float> histogram;
     // cube for positions
     ci::gl::BufferObjRef verticesBuffer;
     ci::gl::BufferObjRef indicesBuffer;
@@ -35,6 +35,9 @@ private:
     cinder::gl::GlslProgRef positionsShader;
     // volume raycast
     cinder::gl::GlslProgRef raycastShader;
+    // compute shaders
+    ci::gl::Texture1dRef histogramTexture;
+    cinder::gl::GlslProgRef histogramCompute;
     // raycast parameters
     glm::vec3 dimensions;
     glm::vec3 stepSize;
@@ -49,4 +52,7 @@ private:
     void createFbos();
     void readVolumeFromFile8(const glm::vec3& dimensions, const std::string filepath);
     void readVolumeFromFile16(const glm::vec3& dimensions, const std::string filepath);
+
+    template<typename T, typename = typename std::enable_if<std::is_arithmetic<T>::value, T>::type>
+    void extractHistogram(std::vector<T> volume);
 };
