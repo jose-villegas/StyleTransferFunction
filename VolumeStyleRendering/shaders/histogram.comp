@@ -1,44 +1,44 @@
 #version 430 compatibility
 #extension GL_ARB_shader_image_load_store : require
-layout (local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 layout(binding=0, r8ui) uniform readonly uimage3D volume;
 layout(binding=1, r32ui) uniform volatile uimage1D globalHistogram;
 
 shared uint histogram[256];
-shared uint maxValue;
 
 void main()
 {
-    // only one thread initializes shared variables
-    if(gl_LocalInvocationIndex == 0)
-    {
-        for(int i = 0; i < 256; i++)
-        {
-            histogram[i] = 0;
-        }
-
-        maxValue = 0;
-    }
-    
-    // get current pixel opacity
-    ivec3 readPos = ivec3(gl_GlobalInvocationID);
-    uint value = imageLoad(volume, readPos).r;
-
-    // write to shared memory
-    atomicAdd(histogram[value], 1U);
-    atomicMax(maxValue, histogram[value]);
+    // initialize shared variable and set global to zeroes
+    histogram[gl_LocalInvocationID.x] = 0;
+    imageStore(globalHistogram, int(gl_LocalInvocationID.x), uvec4(0));
 
     // synchronize
     barrier();
     memoryBarrierShared();
 
-    // imageAtomicMax(globalHistogram, int(gl_LocalInvocationIndex), histogram[0]);
-    if(gl_LocalInvocationIndex == 0)
+    // calculate histogram values
+    uvec3 volumeSize = imageSize(volume);
+    uint totalSize = volumeSize.x * volumeSize.y * volumeSize.z;
+    uint workLoadPerThread = uint(ceil(totalSize / 256));
+    uint begin = gl_LocalInvocationID.x * workLoadPerThread;
+    uint end = min(begin + workLoadPerThread, totalSize);
+
+    for(uint i = begin; i < end; i++)
     {
-        for(int i = 0; i < 256; i++)
-        {
-            imageAtomicAdd(globalHistogram, i, histogram[i]);
-        }
+        ivec3 uvs;
+        uvs.x = int(i % volumeSize.x);
+		uvs.y = int(((i - uvs.x) / volumeSize.x) % volumeSize.y);
+		uvs.z = int((i - uvs.x) / (volumeSize.y * volumeSize.x));
+
+        uint value = imageLoad(volume, uvs).r;
+        atomicAdd(histogram[value], 1);
     }
+
+    // synchronize
+    barrier();
+    memoryBarrierShared();
+
+    // save to global histogram
+    imageAtomicAdd(globalHistogram, int(gl_LocalInvocationID.x), histogram[gl_LocalInvocationID.x]);
 }

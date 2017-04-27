@@ -2,6 +2,8 @@
 #include <thread>
 #include <cinder/app/AppBase.h>
 #include <cinder/Log.h>
+#include <glload/_int_gl_exts.h>
+#include <glload/_int_gl_4_4.h>
 using namespace ci;
 using namespace glm;
 
@@ -270,12 +272,12 @@ void Volume3D::drawVolume() const
     }
 
     histogramCompute->bind();
+    static std::vector<int> white(256);
 
     glBindImageTexture(0, volumeTexture->getId(), 0, true, 0, GL_READ_ONLY, GL_R8UI);
     glBindImageTexture(1, histogramTexture->getId(), 0, false, 0, GL_READ_WRITE, GL_R32UI);
 
-    gl::dispatchCompute(ceil(dimensions.x / 8), ceil(dimensions.y / 8), ceil(dimensions.z / 4));
-    gl::memoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+    gl::dispatchCompute(1, 1, 1);
 }
 
 template<typename T, typename>
@@ -290,22 +292,4 @@ void Volume3D::extractHistogram(std::vector<T> volume)
     format.setDataType(GL_UNSIGNED_INT);
     format.setInternalFormat(GL_R32UI);
     histogramTexture = gl::Texture1d::create(histogramData.data(), GL_RED_INTEGER, 256, format);
-
-    return;
-
-    int limit = static_cast<float>(std::numeric_limits<T>().max());
-    float maxOccurrence = 0;
-    histogram = std::vector<float>(limit + 1);
-    fill(histogram.begin(), histogram.end(), 0.0f);
-
-    // fill histogram with ocurrences per opacity
-    for (auto& val : volume)
-    {
-        int value = static_cast<int>(val);
-        histogram[value] = histogram[value] + 1.0f;
-        maxOccurrence = max(maxOccurrence, histogram[value]);
-    }
-
-    // normalize values
-    std::for_each(histogram.begin(), histogram.end(), [=](float& val) { val = val / maxOccurrence; });
 }
