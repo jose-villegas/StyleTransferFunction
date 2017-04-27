@@ -36,7 +36,7 @@ private:
     // volume raycast
     cinder::gl::GlslProgRef raycastShader;
     // compute shaders
-    ci::gl::Texture1dRef histogramTexture;
+    cinder::gl::SsboRef histogramSsbo;
     cinder::gl::GlslProgRef histogramCompute;
     // raycast parameters
     glm::vec3 dimensions;

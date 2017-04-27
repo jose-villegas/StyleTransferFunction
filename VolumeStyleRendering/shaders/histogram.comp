@@ -3,21 +3,23 @@
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 layout(binding=0, r8ui) uniform readonly uimage3D volume;
-layout(binding=1, r32ui) uniform volatile uimage1D globalHistogram;
+layout(std430, binding=1) coherent buffer Histogram
+{
+    uint histogramData[256];
+};
 
-shared uint histogram[256];
+shared uint sharedHistogram[256];
 
 void main()
 {
     // initialize shared variable and set global to zeroes
-    histogram[gl_LocalInvocationID.x] = 0;
-    imageStore(globalHistogram, int(gl_LocalInvocationID.x), uvec4(0));
+    sharedHistogram[gl_LocalInvocationID.x] = 0;
 
     // synchronize
     barrier();
     memoryBarrierShared();
 
-    // calculate histogram values
+    // calculate sharedHistogram values
     uvec3 volumeSize = imageSize(volume);
     uint totalSize = volumeSize.x * volumeSize.y * volumeSize.z;
     uint workLoadPerThread = uint(ceil(totalSize / 256));
@@ -32,13 +34,13 @@ void main()
 		uvs.z = int((i - uvs.x) / (volumeSize.y * volumeSize.x));
 
         uint value = imageLoad(volume, uvs).r;
-        atomicAdd(histogram[value], 1);
+        atomicAdd(sharedHistogram[value], 1);
     }
 
     // synchronize
     barrier();
     memoryBarrierShared();
 
-    // save to global histogram
-    imageAtomicAdd(globalHistogram, int(gl_LocalInvocationID.x), histogram[gl_LocalInvocationID.x]);
+    // save to global sharedHistogram
+    atomicAdd(histogramData[gl_LocalInvocationID.x], sharedHistogram[gl_LocalInvocationID.x]);
 }

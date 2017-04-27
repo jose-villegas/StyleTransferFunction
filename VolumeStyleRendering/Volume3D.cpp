@@ -116,7 +116,6 @@ void Volume3D::readVolumeFromFile8(const vec3& dimensions, const std::string fil
 
     if (file.read(reinterpret_cast<char*>(buffer.data()), size))
     {
-
         // create 3D texture
         auto format = gl::Texture3d::Format().magFilter(GL_LINEAR)
                                              .minFilter(GL_LINEAR)
@@ -270,26 +269,39 @@ void Volume3D::drawVolume() const
         vertexArrayObject->bind();
         gl::drawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, static_cast<GLuint *>(nullptr));
     }
-
-    histogramCompute->bind();
-    static std::vector<int> white(256);
-
-    glBindImageTexture(0, volumeTexture->getId(), 0, true, 0, GL_READ_ONLY, GL_R8UI);
-    glBindImageTexture(1, histogramTexture->getId(), 0, false, 0, GL_READ_WRITE, GL_R32UI);
-
-    gl::dispatchCompute(1, 1, 1);
 }
 
 template<typename T, typename>
 void Volume3D::extractHistogram(std::vector<T> volume)
 {
     std::vector<uint32_t> histogramData(256);
-    fill(histogramData.begin(), histogramData.end(), 0);
-    // create 3D texture
-    auto format = gl::Texture1d::Format().magFilter(GL_LINEAR)
-                                         .minFilter(GL_LINEAR)
-                                         .wrapS(GL_CLAMP_TO_EDGE);
-    format.setDataType(GL_UNSIGNED_INT);
-    format.setInternalFormat(GL_R32UI);
-    histogramTexture = gl::Texture1d::create(histogramData.data(), GL_RED_INTEGER, 256, format);
+    // create shader storage buffer
+    histogramSsbo = gl::Ssbo::create(256 * sizeof(uint32_t), histogramData.data(), GL_DYNAMIC_COPY);
+    histogramSsbo->bindBase(1);
+
+    // compute histogram
+    {
+        // bind histogram compute shader
+        histogramCompute->bind();
+        // volume texture
+        glBindImageTexture(0, volumeTexture->getId(), 0, true, 0, GL_READ_ONLY, GL_R8UI);
+        bindBufferBase(histogramSsbo->getTarget(), 1, histogramSsbo);
+        // compute histogram
+        gl::dispatchCompute(1, 1, 1);
+        // block to ensure completion
+        gl::memoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    }
+
+    // extract histogram values
+    uint32_t* ssboValues = reinterpret_cast<uint32_t*>(histogramSsbo->map(GL_WRITE_ONLY));
+    memcpy(histogramData.data(), ssboValues, 256 * sizeof(uint32_t));
+    histogramSsbo->unmap();
+    // convert to normalized floating values
+    auto maxValue = max_element(histogramData.begin(), histogramData.end());
+
+    // normalize and insert values
+    for(auto &val : histogramData)
+    {
+        histogram.push_back(static_cast<float>(val) / *maxValue);
+    }
 }
