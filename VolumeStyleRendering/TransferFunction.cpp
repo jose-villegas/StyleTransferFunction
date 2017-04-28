@@ -11,6 +11,8 @@ void TransferFunction::insertLimitPoints(const int limit)
 
     alphaPoints[0] = TransferFunctionAlphaPoint(1.0, 0);
     alphaPoints[limit] = TransferFunctionAlphaPoint(1.0, limit);
+
+    updateSplines();
 }
 
 TransferFunction::TransferFunction(const int limit) : volume(nullptr)
@@ -43,6 +45,7 @@ void TransferFunction::drawControlPointList(int& pointType)
             if (ui::ColorEdit3("##color", value_ptr(pColor)))
             {
                 it->second.setColor(pColor);
+                updateSplines();
             }
 
             ui::SameLine();
@@ -61,6 +64,7 @@ void TransferFunction::drawControlPointList(int& pointType)
                         std::swap(colorPoints[pIso], it->second);
                         colorPoints.erase(it++);
                         deletedValue = true;
+                        updateSplines();
                     }
                 }
             }
@@ -83,6 +87,7 @@ void TransferFunction::drawControlPointList(int& pointType)
                 {
                     colorPoints.erase(it++);
                     deletedValue = true;
+                    updateSplines();
                 }
             }
 
@@ -109,6 +114,7 @@ void TransferFunction::drawControlPointList(int& pointType)
             if (ui::DragFloat("##alpha", &pAlpha, 0.01f, 0.0f, 1.0f))
             {
                 it->second.setAlpha(pAlpha);
+                updateSplines();
             }
 
             ui::SameLine();
@@ -127,6 +133,7 @@ void TransferFunction::drawControlPointList(int& pointType)
                         std::swap(alphaPoints[pIso], it->second);
                         alphaPoints.erase(it++);
                         deletedValue = true;
+                        updateSplines();
                     }
                 }
             }
@@ -149,6 +156,7 @@ void TransferFunction::drawControlPointList(int& pointType)
                 {
                     alphaPoints.erase(it++);
                     deletedValue = true;
+                    updateSplines();
                 }
             }
 
@@ -160,6 +168,68 @@ void TransferFunction::drawControlPointList(int& pointType)
         ui::EndGroup();
         ui::TreePop();
     }
+}
+
+std::vector<TransferFunction::Cubic> TransferFunction::calculateCubicSpline(std::vector<vec3> points)
+{
+    auto n = points.size() - 1;
+    auto& v = points;
+    std::vector<vec3> gamma(n + 1);
+    std::vector<vec3> delta(n + 1);
+    std::vector<vec3> D(n + 1);
+
+    int i;
+    /* We need to solve the equation
+    * taken from: http://mathworld.wolfram.com/CubicSpline.html
+    [2 1       ] [D[0]]   [3(v[1] - v[0])  ]
+    |1 4 1     | |D[1]|   |3(v[2] - v[0])  |
+    |  1 4 1   | | .  | = |      .         |
+    |    ..... | | .  |   |      .         |
+    |     1 4 1| | .  |   |3(v[n] - v[n-2])|
+    [       1 2] [D[n]]   [3(v[n] - v[n-1])]
+
+    by converting the matrix to upper triangular.
+    The D[i] are the derivatives at the control points.
+    */
+
+    //this builds the coefficients of the left matrix
+    gamma[0] = vec3(0);
+    gamma[0].x = 1.0f / 2.0f;
+    gamma[0].y = 1.0f / 2.0f;
+    gamma[0].z = 1.0f / 2.0f;
+
+    for (i = 1; i < n; i++)
+    {
+        gamma[i] = vec3(1) / ((4.0f * vec3(1)) - gamma[i - 1]);
+    }
+
+    gamma[n] = vec3(1) / ((2.0f * vec3(1)) - gamma[n - 1]);
+
+    delta[0] = 3.0f * (v[1] - v[0]) * gamma[0];
+
+    for (i = 1; i < n; i++)
+    {
+        delta[i] = (3.0f * (v[i + 1] - v[i - 1]) - delta[i - 1]) * gamma[i];
+    }
+
+    delta[n] = (3.0f * (v[n] - v[n - 1]) - delta[n - 1]) * gamma[n];
+
+    D[n] = delta[n];
+
+    for (i = n - 1; i >= 0; i--)
+    {
+        D[i] = delta[i] - gamma[i] * D[i + 1];
+    }
+
+    // now compute the coefficients of the cubics 
+    std::vector<Cubic> C(n);
+
+    for (i = 0; i < n; i++)
+    {
+        C[i] = Cubic(v[i], D[i], 3.0f * (v[i + 1] - v[i]) - 2.0f * D[i] - D[i + 1], 2.0f * (v[i] - v[i + 1]) + D[i] + D[i + 1]);
+    }
+
+    return C;
 }
 
 void TransferFunction::drawControlPointCreationUi()
@@ -202,6 +272,8 @@ void TransferFunction::drawControlPointCreationUi()
         {
             colorPoints[isoValue] = TransferFunctionColorPoint(color, isoValue);
         }
+
+        updateSplines();
     }
 
     drawControlPointList(pointType);
@@ -211,18 +283,32 @@ void TransferFunction::drawColorPointsUi()
 {
     const ImVec2 p = ui::GetCursorScreenPos();
     ImDrawList* drawList = ui::GetWindowDrawList();
-    ImU32 col32 = ImColor(1.0f, 1.0f, 1.0f, 1.0f);
     float sz = 20.0f;
     float x = p.x + 4.0f;
     float y = p.y + 4.0f;
 
     for (int i = 0; i < 256; i++)
     {
-        drawList->AddLine(ImVec2(x, y), ImVec2(x, y + sz), col32, 3);
+        const auto &color = getColor(static_cast<float>(i) / 255);
+        ImU32 col32 = ImColor(color);
+
+        drawList->AddLine(ImVec2(x, y), ImVec2(x, y + sz), col32, 4);
         x += 2.0f;
     }
 
-    ui::Dummy(ImVec2(520, sz + 8.0f));
+    x = p.x + 4.0f;
+
+    for(auto &colorP : colorPoints)
+    {
+        const auto &color = colorP.second.getColor();
+        ImU32 col32 = ImColor(color.r, color.g, color.b, 1.0f);
+        ImU32 invCol32 = ImColor(1.0f - color.r, 1.0f - color.g, 1.0f - color.b, 1.0f);
+
+        drawList->AddCircleFilled(ImVec2(p.x + 2.0f * colorP.first + 4.0f, y + sz), 5, col32, 24);
+        drawList->AddCircle(ImVec2(p.x + 2.0f * colorP.first + 4.0f, y + sz), 5, invCol32, 24);
+    }
+
+    ui::Dummy(ImVec2(520, sz + 12.0f));
 }
 
 void TransferFunction::drawHistogram()
@@ -312,7 +398,85 @@ void TransferFunction::removeAlphaPoint(const int isoValue)
     }
 }
 
+TransferFunction::Cubic::Cubic(vec3 a, vec3 b, vec3 c, vec3 d)
+{
+    this->a = a;
+    this->b = b;
+    this->c = c;
+    this->d = d;
+}
+
+vec3 TransferFunction::Cubic::getPointOnSpline(float s) const
+{
+    return (((d * s) + c) * s + b) * s + a;
+}
+
 void TransferFunction::setVolume(const Volume3D& volume)
 {
     this->volume = &volume;
+}
+
+void TransferFunction::updateSplines()
+{
+    std::vector<vec3> alphaCtrPoints;
+    std::vector<vec3> colorCtrPoints;
+
+    for (auto& val : alphaPoints)
+    {
+        alphaCtrPoints.push_back(vec3(val.second.getAlpha()));
+    }
+
+    for (auto& val : colorPoints)
+    {
+        colorCtrPoints.push_back(vec3(val.second.getColor()));
+    }
+
+    alphaSpline = calculateCubicSpline(alphaCtrPoints);
+    colorSpline = calculateCubicSpline(colorCtrPoints);
+}
+
+vec4 TransferFunction::getColor(const float t)
+{
+    float alpha = 0;
+    vec3 color = vec3(0);
+    int i = 0;
+    int isoValue = t * 255;
+
+    for (auto it = alphaPoints.cbegin(); it != --alphaPoints.cend() && i < alphaSpline.size();)
+    {
+        int currentIso = it->first;
+        int nextIso = (++it)->first;
+
+        // find cubic index
+        if(isoValue >= currentIso && isoValue < nextIso)
+        {
+            auto &currentCubic = alphaSpline[i];
+            float evalAt = static_cast<float>(isoValue - currentIso) / (nextIso - currentIso);
+            alpha = currentCubic.getPointOnSpline(evalAt).r;
+            break;
+        }
+ 
+        i++;
+    }
+
+    i = 0;
+
+    for (auto it = colorPoints.cbegin(); it != --colorPoints.cend() && i < colorSpline.size();)
+    {
+        int currentIso = it->first;
+        int nextIso = (++it)->first;
+
+        // find cubic index
+        if (isoValue >= currentIso && isoValue < nextIso)
+        {
+            auto &currentCubic = colorSpline[i];
+            float evalAt = static_cast<float>(isoValue - currentIso) / (nextIso - currentIso);
+            color = currentCubic.getPointOnSpline(evalAt);
+            break;
+        }
+
+        i++;
+    }
+
+    return vec4(color.r, color.g, color.b, alpha);
 }
