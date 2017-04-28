@@ -1,9 +1,6 @@
 #include "Volume3D.h"
-#include <thread>
 #include <cinder/app/AppBase.h>
 #include <cinder/Log.h>
-#include <glload/_int_gl_exts.h>
-#include <glload/_int_gl_4_4.h>
 using namespace ci;
 using namespace glm;
 
@@ -304,4 +301,9 @@ void Volume3D::extractHistogram(std::vector<T> volume)
     {
         histogram.push_back(static_cast<float>(val) / *maxValue);
     }
+}
+
+const std::vector<float>& Volume3D::getHistogram() const
+{
+    return histogram;
 }

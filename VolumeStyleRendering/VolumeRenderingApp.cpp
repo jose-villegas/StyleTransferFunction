@@ -103,6 +103,7 @@ void VolumeRenderingApp::drawUi()
         if (ui::Button("Load", ImVec2(ui::GetContentRegionAvailWidth(), 0)))
         {
             volume.createFromFile(slices, ratios, path.string(), bits == 1);
+            transferFunction.setVolume(volume);
             // position camera looking at volume
             camera.setEyePoint(volume.centerPoint() + vec3(0, 0, 2));
             camera.lookAt(volume.centerPoint());

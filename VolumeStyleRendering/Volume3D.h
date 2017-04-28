@@ -16,6 +16,7 @@ public:
     void setStepScale(const float& value);
     const glm::vec3 &getAspectRatios() const;
     void setAspectratios(const glm::vec3& value);
+    const std::vector<float> &getHistogram() const;
 private:
     // histogram data
     std::vector<float> histogram;
