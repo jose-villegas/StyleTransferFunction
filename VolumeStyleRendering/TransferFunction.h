@@ -7,13 +7,11 @@ class TransferFunction
 {
 public:
     TransferFunction();
-    explicit TransferFunction(const int limit);
     ~TransferFunction();
     glm::vec4 getColor(const float t /* t=[0..1] */);
     void drawUi(bool& open);
     void setVolume(const Volume3D& volume);
     void updateSplines();
-    void setLimit(const int limit);
     void addColorPoint(const glm::vec3& color, const int isoValue);
     void addAlphaPoint(const float alpha, const int isoValue);
     void removeColorPoint(const int isoValue);
@@ -34,14 +32,15 @@ private:
     };
 
     const Volume3D* volume;
-    std::map<int, TransferFunctionColorPoint> colorPoints;
-    std::map<int, TransferFunctionAlphaPoint> alphaPoints;
+    std::vector<TransferFunctionColorPoint> colorPoints;
+    std::vector<TransferFunctionAlphaPoint> alphaPoints;
     std::vector<Cubic> alphaSpline;
     std::vector<Cubic> colorSpline;
+    std::array<glm::vec4, 256> indexedTransferFunction;
 
     void insertLimitPoints(const int limit);
     void drawHistogram();
-    void drawColorPointsUi();
+    void drawControlPointsUi();
     void drawControlPointCreationUi();
     void drawControlPointList(int& pointType);
 

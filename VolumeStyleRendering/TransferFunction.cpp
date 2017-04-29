@@ -6,29 +6,65 @@ using namespace glm;
 
 void TransferFunction::insertLimitPoints(const int limit)
 {
-    colorPoints[0] = TransferFunctionColorPoint(vec3(1), 0);
-    colorPoints[limit] = TransferFunctionColorPoint(vec3(1), limit);
+    colorPoints.push_back(TransferFunctionColorPoint(vec3(1), 0));
+    colorPoints.push_back(TransferFunctionColorPoint(vec3(1), limit));
 
-    alphaPoints[0] = TransferFunctionAlphaPoint(1.0, 0);
-    alphaPoints[limit] = TransferFunctionAlphaPoint(1.0, limit);
+    alphaPoints.push_back(TransferFunctionAlphaPoint(1.0, 0));
+    alphaPoints.push_back(TransferFunctionAlphaPoint(1.0, limit));
 
     updateSplines();
 }
 
-TransferFunction::TransferFunction(const int limit) : volume(nullptr)
-{
-    insertLimitPoints(limit);
-}
 
 TransferFunction::TransferFunction() : volume(nullptr)
 {
-    insertLimitPoints(std::numeric_limits<uint8_t>().max());
+    insertLimitPoints(255);
 }
 
 TransferFunction::~TransferFunction() {}
 
 void TransferFunction::drawControlPointList(int& pointType)
 {
+    bool deleteCtrlPoint = false;
+    bool sortPoints = false;
+
+    auto isoValueControl = [&](TransferFunctionPoint& p)
+            {
+                int pIso = p.getIsoValue();
+                ui::SameLine();
+                ui::PushItemWidth(-30);
+
+                if (p.getIsoValue() != 0 && p.getIsoValue() != 255)
+                {
+                    if (ui::SliderInt("##isoValA", &pIso, 1, 254))
+                    {
+                        pIso = min(max(pIso, 1), 254);
+                        p.setIsoValue(pIso);
+                        sortPoints = true;
+                    }
+                }
+                else if (p.getIsoValue() == 0 || p.getIsoValue() == 255)
+                {
+                    ui::PushStyleColor(ImGuiCol_Button, ImVec4(vec4(0.5f)));
+                    ui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(vec4(0.5f)));
+                    ui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(vec4(0.5f)));
+                    ui::Button(std::to_string(p.getIsoValue()).c_str(), ImVec2(ui::GetContentRegionAvailWidth() - 30, 0));
+                    ui::PopStyleColor(3);
+                }
+
+                ui::PopItemWidth();
+
+                if (p.getIsoValue() != 0 && p.getIsoValue() != 255)
+                {
+                    ui::SameLine();
+
+                    if (ui::Button("X", ImVec2(ui::GetContentRegionAvailWidth(), 0)))
+                    {
+                        deleteCtrlPoint = true;
+                    }
+                }
+            };
+
     // draw control point list
     if (pointType == 1 && ui::TreeNode("Color Points"))
     {
@@ -37,136 +73,86 @@ void TransferFunction::drawControlPointList(int& pointType)
 
         for (auto it = colorPoints.begin(); it != colorPoints.end();)
         {
-            ui::PushID(it->first);
-            auto pColor = it->second.getColor();
-            auto pIso = it->second.getIsoValue();
-            bool deletedValue = false;
+            ui::PushID(&(*it));
+            auto pColor = it->getColor();
+
+            ui::PushItemWidth(ui::GetContentRegionAvailWidth() * 0.5f);
 
             if (ui::ColorEdit3("##color", value_ptr(pColor)))
             {
-                it->second.setColor(pColor);
+                it->setColor(pColor);
                 updateSplines();
-            }
-
-            ui::SameLine();
-            ui::PushItemWidth(-30);
-
-            if (it->first != 0 && it->first != 255)
-            {
-                if (ui::InputInt("##isoValA", &pIso, 1, 5, ImGuiInputTextFlags_EnterReturnsTrue))
-                {
-                    pIso = min(max(pIso, 1), 254);
-                    bool alreadyExist = colorPoints.find(pIso) != colorPoints.end();
-
-                    if (!alreadyExist)
-                    {
-                        it->second.setIsoValue(pIso);
-                        std::swap(colorPoints[pIso], it->second);
-                        colorPoints.erase(it++);
-                        deletedValue = true;
-                        updateSplines();
-                    }
-                }
-            }
-            else if (it->first == 0 || it->first == 255)
-            {
-                ui::PushStyleColor(ImGuiCol_Button, ImVec4(vec4(0.5f)));
-                ui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(vec4(0.5f)));
-                ui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(vec4(0.5f)));
-                ui::Button(std::to_string(it->first).c_str(), ImVec2(ui::GetContentRegionAvailWidth() - 30, 0));
-                ui::PopStyleColor(3);
             }
 
             ui::PopItemWidth();
 
-            if (it->first != 0 && it->first != 255)
-            {
-                ui::SameLine();
+            isoValueControl(*it);
+            deleteCtrlPoint ? it = colorPoints.erase(it) : ++it;
 
-                if (ui::Button("X", ImVec2(ui::GetContentRegionAvailWidth(), 0)))
-                {
-                    colorPoints.erase(it++);
-                    deletedValue = true;
-                    updateSplines();
-                }
+            if (deleteCtrlPoint)
+            {
+                updateSplines();
+                deleteCtrlPoint = false;
             }
 
-            if (!deletedValue) ++it;
             ui::PopID();
         }
 
         ui::EndChild();
         ui::EndGroup();
         ui::TreePop();
+
+        if (sortPoints)
+        {
+            // sort by iso value
+            sort(colorPoints.begin(), colorPoints.end());
+            // update
+            updateSplines();
+        }
     }
     else if (pointType == 0 && ui::TreeNode("Alpha Points"))
     {
         ui::BeginGroup();
         ui::BeginChild(ui::GetID((void*)(intptr_t)pointType), ImVec2(ui::GetContentRegionAvailWidth(), 120), true);
-
-        for (auto it = alphaPoints.begin(); it != alphaPoints.end();)
+        
+        for ( auto it = alphaPoints.begin(); it != alphaPoints.end();)
         {
-            auto pAlpha = it->second.getAlpha();
-            auto pIso = it->second.getIsoValue();
-            bool deletedValue = false;
-            ui::PushID(it->first);
+            ui::PushID(&(*it));
+            auto pAlpha = it->getAlpha();
+
+            ui::PushItemWidth(ui::GetContentRegionAvailWidth() * 0.5f);
 
             if (ui::DragFloat("##alpha", &pAlpha, 0.01f, 0.0f, 1.0f))
             {
-                it->second.setAlpha(pAlpha);
+                it->setAlpha(pAlpha);
                 updateSplines();
-            }
-
-            ui::SameLine();
-            ui::PushItemWidth(-30);
-
-            if (it->first != 0 && it->first != 255)
-            {
-                if (ui::InputInt("##isoValA", &pIso, 1, 5, ImGuiInputTextFlags_EnterReturnsTrue))
-                {
-                    pIso = min(max(pIso, 1), 254);
-                    bool alreadyExist = alphaPoints.find(pIso) != alphaPoints.end();
-
-                    if (!alreadyExist)
-                    {
-                        it->second.setIsoValue(pIso);
-                        std::swap(alphaPoints[pIso], it->second);
-                        alphaPoints.erase(it++);
-                        deletedValue = true;
-                        updateSplines();
-                    }
-                }
-            }
-            else if (it->first == 0 || it->first == 255)
-            {
-                ui::PushStyleColor(ImGuiCol_Button, ImVec4(vec4(0.5f)));
-                ui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(vec4(0.5f)));
-                ui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(vec4(0.5f)));
-                ui::Button(std::to_string(it->first).c_str(), ImVec2(ui::GetContentRegionAvailWidth() - 30, 0));
-                ui::PopStyleColor(3);
             }
 
             ui::PopItemWidth();
 
-            if (it->first != 0 && it->first != 255)
-            {
-                ui::SameLine();
+            isoValueControl(*it);
+            deleteCtrlPoint ? it = alphaPoints.erase(it) : ++it;
 
-                if (ui::Button("X", ImVec2(ui::GetContentRegionAvailWidth(), 0)))
-                {
-                    alphaPoints.erase(it++);
-                    deletedValue = true;
-                    updateSplines();
-                }
+            if (deleteCtrlPoint)
+            {
+                updateSplines();
+                deleteCtrlPoint = false;
             }
 
-            if (!deletedValue) ++it;
             ui::PopID();
         }
 
         ui::EndChild();
         ui::EndGroup();
         ui::TreePop();
+
+        if (sortPoints)
+        {
+            // sort by iso value
+            sort(alphaPoints.begin(), alphaPoints.end());
+            // update
+            updateSplines();
+        }
     }
 }
 
@@ -236,7 +222,7 @@ void TransferFunction::drawControlPointCreationUi()
 {
     // creation bar
     static int pointType = 0;
-    static int isoValue = 0;
+    static int isoValue = 127;
     static float alpha;
     static vec3 color;
     ui::BeginGroup();
@@ -245,7 +231,7 @@ void TransferFunction::drawControlPointCreationUi()
     ui::SameLine();
     ui::RadioButton("Color Point", &pointType, 1);
     // iso value bar
-    ui::SliderInt("Iso Value", &isoValue, 0, 255);
+    ui::SliderInt("Iso Value", &isoValue, 1, 254);
 
     // alpha point
     if (pointType == 0)
@@ -256,59 +242,66 @@ void TransferFunction::drawControlPointCreationUi()
     {
         ui::ColorEdit3("Color", value_ptr(color));
     }
-    ui::EndGroup();
 
+    ui::EndGroup();
     ImVec2 size = ImGui::GetItemRectSize();
-    size.x = 512 - size.x;
     ui::SameLine();
 
-    if (ui::Button("Add Point", size))
+    if (ui::Button("Add Point", ImVec2(ui::GetContentRegionAvailWidth(), size.y)))
     {
-        if (pointType == 0)
-        {
-            alphaPoints[isoValue] = TransferFunctionAlphaPoint(alpha, isoValue);
-        }
-        else
-        {
-            colorPoints[isoValue] = TransferFunctionColorPoint(color, isoValue);
-        }
-
-        updateSplines();
+        pointType == 0 ? addAlphaPoint(alpha, isoValue) : addColorPoint(color, isoValue);
     }
 
     drawControlPointList(pointType);
 }
 
-void TransferFunction::drawColorPointsUi()
+void TransferFunction::drawControlPointsUi()
 {
     const ImVec2 p = ui::GetCursorScreenPos();
     ImDrawList* drawList = ui::GetWindowDrawList();
+    int width = ui::GetContentRegionAvailWidth() - 4.0f;
+    ImU32 white = ImColor(1.0f, 1.0f, 1.0f, 1.0f);
+    ImU32 black = ImColor(0.0f, 0.0f, 0.0f, 1.0f);
     float sz = 20.0f;
     float x = p.x + 4.0f;
     float y = p.y + 4.0f;
+    float step = static_cast<float>(width) / 256;
 
     for (int i = 0; i < 256; i++)
     {
-        const auto &color = getColor(static_cast<float>(i) / 255);
+        const auto& color = getColor(static_cast<float>(i) / 255);
         ImU32 col32 = ImColor(color);
-
-        drawList->AddLine(ImVec2(x, y), ImVec2(x, y + sz), col32, 4);
-        x += 2.0f;
+        // draw color transfer function
+        drawList->AddLine(ImVec2(x, y), ImVec2(x, y + sz), col32, 2.0f * step);
+        x += step;
     }
 
-    x = p.x + 4.0f;
-
-    for(auto &colorP : colorPoints)
+    for (auto& colorP : colorPoints)
     {
-        const auto &color = colorP.second.getColor();
+        const auto& color = colorP.getColor();
         ImU32 col32 = ImColor(color.r, color.g, color.b, 1.0f);
         ImU32 invCol32 = ImColor(1.0f - color.r, 1.0f - color.g, 1.0f - color.b, 1.0f);
-
-        drawList->AddCircleFilled(ImVec2(p.x + 2.0f * colorP.first + 4.0f, y + sz), 5, col32, 24);
-        drawList->AddCircle(ImVec2(p.x + 2.0f * colorP.first + 4.0f, y + sz), 5, invCol32, 24);
+        drawList->AddCircleFilled(ImVec2(p.x + step * colorP.getIsoValue() + 4.0f, y + sz), 5, col32, 24);
+        drawList->AddCircle(ImVec2(p.x + step * colorP.getIsoValue() + 4.0f, y + sz), 5, invCol32, 24);
     }
 
-    ui::Dummy(ImVec2(520, sz + 12.0f));
+    for (int i = 0; i < indexedTransferFunction.size() - 1; i++)
+    {
+        auto aBegin = clamp(1.0f - indexedTransferFunction[i].a, 0.0f, 1.0f);
+        auto aEnd = clamp(1.0f - indexedTransferFunction[i + 1].a, 0.0f, 1.0f);
+        drawList->AddLine(ImVec2(p.x + step * i + 4.0f, y - 124.0f + aBegin * 120),
+                          ImVec2(p.x + step * (i + 1) + 4.0f, y - 124.0f + aEnd * 120), white, 1);
+    }
+
+    for (auto& alphaP : alphaPoints)
+    {
+        const auto& alpha = 1.0f - alphaP.getAlpha();
+        ImU32 opacity = ImColor(1.0f - vec4(alpha));
+        drawList->AddCircleFilled(ImVec2(p.x + step * alphaP.getIsoValue() + 4.0f, y - 124.0f + alpha * 120), 5, opacity, 24);
+        drawList->AddCircle(ImVec2(p.x + step * alphaP.getIsoValue() + 4.0f, y - 124.0f + alpha * 120), 5, black, 24);
+    }
+
+    ui::Dummy(ImVec2(ui::GetContentRegionAvailWidth(), sz + 15.0f));
 }
 
 void TransferFunction::drawHistogram()
@@ -321,8 +314,6 @@ void TransferFunction::drawHistogram()
 
 void TransferFunction::drawUi(bool& open)
 {
-    ui::ShowTestWindow();
-
     if (!ui::Begin("Transfer Function", &open, ImGuiWindowFlags_AlwaysAutoResize))
     {
         ui::End();
@@ -331,71 +322,71 @@ void TransferFunction::drawUi(bool& open)
     if (volume != nullptr)
     {
         drawHistogram();
-        drawColorPointsUi();
+        drawControlPointsUi();
         drawControlPointCreationUi();
     }
 
     ui::End();
 }
 
-void TransferFunction::setLimit(const int limit)
-{
-    alphaPoints.end()->second.setIsoValue(limit);
-    colorPoints.end()->second.setIsoValue(limit);
-}
-
 void TransferFunction::addColorPoint(const vec3& color, const int isoValue)
 {
     // inserted point is off limits
-    if (isoValue <= 0 || isoValue >= colorPoints.end()->second.getIsoValue())
+    if (isoValue <= 0 || isoValue >= colorPoints.back().getIsoValue())
     {
         return;
     }
 
-    colorPoints[isoValue] = TransferFunctionColorPoint(color, isoValue);
+    auto ctrlP = TransferFunctionColorPoint(color, isoValue);
+    // sorted insert
+    colorPoints.insert(upper_bound(colorPoints.begin(), colorPoints.end(), ctrlP), ctrlP);
+    updateSplines();
 }
 
 void TransferFunction::addAlphaPoint(const float alpha, const int isoValue)
 {
     // inserted point is off limits
-    if (isoValue <= 0 || isoValue >= alphaPoints.end()->second.getIsoValue())
+    if (isoValue <= 0 || isoValue >= alphaPoints.back().getIsoValue())
     {
         return;
     }
 
-    alphaPoints[isoValue] = TransferFunctionAlphaPoint(alpha, isoValue);
+    auto ctrlP = TransferFunctionAlphaPoint(alpha, isoValue);
+    // sorted insert
+    alphaPoints.insert(upper_bound(alphaPoints.begin(), alphaPoints.end(), ctrlP), ctrlP);
+    updateSplines();
 }
 
 void TransferFunction::removeColorPoint(const int isoValue)
 {
     // off limits
-    if (isoValue <= 0 || isoValue >= colorPoints.end()->second.getIsoValue())
+    if (isoValue <= 0 || isoValue >= colorPoints.back().getIsoValue())
     {
         return;
     }
 
-    auto it = colorPoints.find(isoValue);
-
-    if (it != colorPoints.end())
-    {
-        colorPoints.erase(it);
-    }
+    colorPoints.erase(std::remove_if(colorPoints.begin(), colorPoints.end(),
+                                     [=](const TransferFunctionColorPoint& p)
+                                     {
+                                         return p.getIsoValue() == isoValue;
+                                     }));
+    updateSplines();
 }
 
 void TransferFunction::removeAlphaPoint(const int isoValue)
 {
     // off limits
-    if (isoValue <= 0 || isoValue >= alphaPoints.end()->second.getIsoValue())
+    if (isoValue <= 0 || isoValue >= alphaPoints.back().getIsoValue())
     {
         return;
     }
 
-    auto it = alphaPoints.find(isoValue);
-
-    if (it != alphaPoints.end())
-    {
-        alphaPoints.erase(it);
-    }
+    alphaPoints.erase(std::remove_if(alphaPoints.begin(), alphaPoints.end(),
+                                     [=](const TransferFunctionAlphaPoint& p)
+                                     {
+                                         return p.getIsoValue() == isoValue;
+                                     }));
+    updateSplines();
 }
 
 TransferFunction::Cubic::Cubic(vec3 a, vec3 b, vec3 c, vec3 d)
@@ -423,16 +414,21 @@ void TransferFunction::updateSplines()
 
     for (auto& val : alphaPoints)
     {
-        alphaCtrPoints.push_back(vec3(val.second.getAlpha()));
+        alphaCtrPoints.push_back(vec3(val.getAlpha()));
     }
 
     for (auto& val : colorPoints)
     {
-        colorCtrPoints.push_back(vec3(val.second.getColor()));
+        colorCtrPoints.push_back(vec3(val.getColor()));
     }
 
     alphaSpline = calculateCubicSpline(alphaCtrPoints);
     colorSpline = calculateCubicSpline(colorCtrPoints);
+
+    for (int i = 0; i < indexedTransferFunction.size(); i++)
+    {
+        indexedTransferFunction[i] = getColor(static_cast<float>(i) / 255);
+    }
 }
 
 vec4 TransferFunction::getColor(const float t)
@@ -444,18 +440,18 @@ vec4 TransferFunction::getColor(const float t)
 
     for (auto it = alphaPoints.cbegin(); it != --alphaPoints.cend() && i < alphaSpline.size();)
     {
-        int currentIso = it->first;
-        int nextIso = (++it)->first;
+        int currentIso = it->getIsoValue();
+        int nextIso = (++it)->getIsoValue();
 
         // find cubic index
-        if(isoValue >= currentIso && isoValue < nextIso)
+        if (isoValue >= currentIso && isoValue <= nextIso)
         {
-            auto &currentCubic = alphaSpline[i];
+            auto& currentCubic = alphaSpline[i];
             float evalAt = static_cast<float>(isoValue - currentIso) / (nextIso - currentIso);
             alpha = currentCubic.getPointOnSpline(evalAt).r;
             break;
         }
- 
+
         i++;
     }
 
@@ -463,13 +459,13 @@ vec4 TransferFunction::getColor(const float t)
 
     for (auto it = colorPoints.cbegin(); it != --colorPoints.cend() && i < colorSpline.size();)
     {
-        int currentIso = it->first;
-        int nextIso = (++it)->first;
+        int currentIso = it->getIsoValue();
+        int nextIso = (++it)->getIsoValue();
 
         // find cubic index
-        if (isoValue >= currentIso && isoValue < nextIso)
+        if (isoValue >= currentIso && isoValue <= nextIso)
         {
-            auto &currentCubic = colorSpline[i];
+            auto& currentCubic = colorSpline[i];
             float evalAt = static_cast<float>(isoValue - currentIso) / (nextIso - currentIso);
             color = currentCubic.getPointOnSpline(evalAt);
             break;

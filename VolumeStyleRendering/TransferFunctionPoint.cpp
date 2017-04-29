@@ -42,6 +42,16 @@ TransferFunctionColorPoint::TransferFunctionColorPoint(const glm::vec3& color, c
     this->color = color;
 }
 
+bool TransferFunctionColorPoint::operator<(const TransferFunctionColorPoint& rhs) const
+{
+    return TransferFunctionPoint::operator<(rhs) ? true : TransferFunctionPoint::operator==(rhs) && length2(this->color) < length2(rhs.color);
+}
+
+bool TransferFunctionColorPoint::operator==(const TransferFunctionColorPoint& rhs) const
+{
+    return TransferFunctionPoint::operator==(rhs) && length2(this->color) == length2(rhs.color);
+}
+
 const float &TransferFunctionAlphaPoint::getAlpha() const
 {
     return alpha;
@@ -55,4 +65,14 @@ void TransferFunctionAlphaPoint::setAlpha(const float value)
 TransferFunctionAlphaPoint::TransferFunctionAlphaPoint(const float alpha, const int iso) : TransferFunctionPoint(iso)
 {
     this->alpha = alpha;
+}
+
+bool TransferFunctionAlphaPoint::operator<(const TransferFunctionAlphaPoint& rhs) const
+{
+    return TransferFunctionPoint::operator<(rhs) ? true : TransferFunctionPoint::operator==(rhs) && this->alpha < rhs.alpha;
+}
+
+bool TransferFunctionAlphaPoint::operator==(const TransferFunctionAlphaPoint& rhs) const
+{
+    return TransferFunctionPoint::operator==(rhs) && this->alpha == rhs.alpha;
 }
