@@ -49,9 +49,10 @@ void VolumeRenderingApp::drawUi()
 {
     static ivec3 slices = ivec3(1);
     static bool loadNewVolume = false;
-    static fs::path path;
+    static bool showVolumeOptions = false;
     static bool showRendering = false;
     static bool showTransferFunction;
+    static fs::path path;
 
     // menu bar on top
     {
@@ -71,7 +72,7 @@ void VolumeRenderingApp::drawUi()
             ui::EndMenu();
         }
 
-        if (ui::BeginMenu("Volume"))
+        if (ui::BeginMenu("Volume", showVolumeOptions))
         {
             ui::MenuItem("Rendering", nullptr, &showRendering);
             ui::MenuItem("Transfer Function", nullptr, &showTransferFunction);
@@ -103,12 +104,11 @@ void VolumeRenderingApp::drawUi()
         if (ui::Button("Load", ImVec2(ui::GetContentRegionAvailWidth(), 0)))
         {
             volume.createFromFile(slices, ratios, path.string(), bits == 1);
-            transferFunction.setVolume(volume);
             // position camera looking at volume
             camera.setEyePoint(volume.centerPoint() + vec3(0, 0, 2));
             camera.lookAt(volume.centerPoint());
             camera.setPivotDistance(2);
-
+            showVolumeOptions = true;
             ui::CloseCurrentPopup();
         }
 
@@ -149,7 +149,7 @@ void VolumeRenderingApp::drawUi()
     // transfer function ui
     if (showTransferFunction)
     {
-        transferFunction.drawUi(showTransferFunction);
+        transferFunction.drawUi(showTransferFunction, volume);
     }
 
     // refresh flags

@@ -16,10 +16,10 @@ public:
     void setStepScale(const float& value);
     const glm::vec3 &getAspectRatios() const;
     void setAspectratios(const glm::vec3& value);
-    const std::vector<float> &getHistogram() const;
+    const std::array<float, 256> &getHistogram() const;
 private:
     // histogram data
-    std::vector<float> histogram;
+    std::array<float, 256> histogram;
     // cube for positions
     ci::gl::BufferObjRef verticesBuffer;
     ci::gl::BufferObjRef indicesBuffer;

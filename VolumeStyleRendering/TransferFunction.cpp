@@ -4,29 +4,23 @@
 #include "Volume3D.h"
 using namespace glm;
 
-void TransferFunction::insertLimitPoints(const int limit)
+TransferFunction::TransferFunction()
 {
     colorPoints.push_back(TransferFunctionColorPoint(vec3(1), 0));
-    colorPoints.push_back(TransferFunctionColorPoint(vec3(1), limit));
+    colorPoints.push_back(TransferFunctionColorPoint(vec3(1), 255));
 
     alphaPoints.push_back(TransferFunctionAlphaPoint(1.0, 0));
-    alphaPoints.push_back(TransferFunctionAlphaPoint(1.0, limit));
+    alphaPoints.push_back(TransferFunctionAlphaPoint(1.0, 255));
 
-    updateSplines();
-}
-
-
-TransferFunction::TransferFunction() : volume(nullptr)
-{
-    insertLimitPoints(255);
+    updateFunction();
 }
 
 TransferFunction::~TransferFunction() {}
 
 void TransferFunction::drawControlPointList(int& pointType)
 {
-    bool deleteCtrlPoint = false;
     bool sortPoints = false;
+    bool deleteCtrlPoint = false;
 
     auto isoValueControl = [&](TransferFunctionPoint& p)
             {
@@ -40,7 +34,9 @@ void TransferFunction::drawControlPointList(int& pointType)
                     {
                         pIso = min(max(pIso, 1), 254);
                         p.setIsoValue(pIso);
-                        sortPoints = true;
+                        sortPoints = pointType == 0 ? !is_sorted(alphaPoints.begin(), alphaPoints.end())
+                                         : !is_sorted(colorPoints.begin(), colorPoints.end());
+                        updateFunction();
                     }
                 }
                 else if (p.getIsoValue() == 0 || p.getIsoValue() == 255)
@@ -66,93 +62,68 @@ void TransferFunction::drawControlPointList(int& pointType)
             };
 
     // draw control point list
-    if (pointType == 1 && ui::TreeNode("Color Points"))
+    if (pointType == 0 ? ui::TreeNode("Alpha Points") : ui::TreeNode("Color Points"))
     {
         ui::BeginGroup();
         ui::BeginChild(ui::GetID((void*)(intptr_t)pointType), ImVec2(ui::GetContentRegionAvailWidth(), 120), true);
 
-        for (auto it = colorPoints.begin(); it != colorPoints.end();)
+        if (pointType == 0)
         {
-            ui::PushID(&(*it));
-            auto pColor = it->getColor();
-
-            ui::PushItemWidth(ui::GetContentRegionAvailWidth() * 0.5f);
-
-            if (ui::ColorEdit3("##color", value_ptr(pColor)))
+            for (auto it = alphaPoints.begin(); it != alphaPoints.end();)
             {
-                it->setColor(pColor);
-                updateSplines();
+                ui::PushID(&(*it));
+                auto pAlpha = it->getAlpha();
+                ui::PushItemWidth(ui::GetContentRegionAvailWidth() * 0.5f);
+
+                if (ui::DragFloat("##alpha", &pAlpha, 0.01f, 0.0f, 1.0f))
+                {
+                    it->setAlpha(pAlpha);
+                    updateFunction();
+                }
+
+                ui::PopItemWidth();
+                isoValueControl(*it);
+                deleteCtrlPoint ? it = alphaPoints.erase(it) : ++it;
+                ui::PopID();
             }
-
-            ui::PopItemWidth();
-
-            isoValueControl(*it);
-            deleteCtrlPoint ? it = colorPoints.erase(it) : ++it;
-
-            if (deleteCtrlPoint)
+        }
+        else if (pointType == 1)
+        {
+            for (auto it = colorPoints.begin(); it != colorPoints.end();)
             {
-                updateSplines();
-                deleteCtrlPoint = false;
-            }
+                ui::PushID(&(*it));
+                auto pColor = it->getColor();
+                ui::PushItemWidth(ui::GetContentRegionAvailWidth() * 0.5f);
 
-            ui::PopID();
+                if (ui::ColorEdit3("##color", value_ptr(pColor)))
+                {
+                    it->setColor(pColor);
+                    updateFunction();
+                }
+
+                ui::PopItemWidth();
+                isoValueControl(*it);
+                deleteCtrlPoint ? it = colorPoints.erase(it) : ++it;
+                ui::PopID();
+            }
         }
 
         ui::EndChild();
         ui::EndGroup();
         ui::TreePop();
-
-        if (sortPoints)
-        {
-            // sort by iso value
-            sort(colorPoints.begin(), colorPoints.end());
-            // update
-            updateSplines();
-        }
     }
-    else if (pointType == 0 && ui::TreeNode("Alpha Points"))
+
+    if (deleteCtrlPoint)
     {
-        ui::BeginGroup();
-        ui::BeginChild(ui::GetID((void*)(intptr_t)pointType), ImVec2(ui::GetContentRegionAvailWidth(), 120), true);
-        
-        for ( auto it = alphaPoints.begin(); it != alphaPoints.end();)
-        {
-            ui::PushID(&(*it));
-            auto pAlpha = it->getAlpha();
+        updateFunction();
+        deleteCtrlPoint = false;
+    }
 
-            ui::PushItemWidth(ui::GetContentRegionAvailWidth() * 0.5f);
-
-            if (ui::DragFloat("##alpha", &pAlpha, 0.01f, 0.0f, 1.0f))
-            {
-                it->setAlpha(pAlpha);
-                updateSplines();
-            }
-
-            ui::PopItemWidth();
-
-            isoValueControl(*it);
-            deleteCtrlPoint ? it = alphaPoints.erase(it) : ++it;
-
-            if (deleteCtrlPoint)
-            {
-                updateSplines();
-                deleteCtrlPoint = false;
-            }
-
-            ui::PopID();
-        }
-
-        ui::EndChild();
-        ui::EndGroup();
-        ui::TreePop();
-
-        if (sortPoints)
-        {
-            // sort by iso value
-            sort(alphaPoints.begin(), alphaPoints.end());
-            // update
-            updateSplines();
-        }
+    if (sortPoints)
+    {
+        // sort by iso value
+        pointType == 0 ? sort(alphaPoints.begin(), alphaPoints.end())
+            : sort(colorPoints.begin(), colorPoints.end());
     }
 }
 
@@ -269,7 +240,7 @@ void TransferFunction::drawControlPointsUi()
 
     for (int i = 0; i < 256; i++)
     {
-        const auto& color = getColor(static_cast<float>(i) / 255);
+        const auto& color = indexedTransferFunction[i];
         ImU32 col32 = ImColor(color);
         // draw color transfer function
         drawList->AddLine(ImVec2(x, y), ImVec2(x, y + sz), col32, 2.0f * step);
@@ -304,27 +275,24 @@ void TransferFunction::drawControlPointsUi()
     ui::Dummy(ImVec2(ui::GetContentRegionAvailWidth(), sz + 15.0f));
 }
 
-void TransferFunction::drawHistogram()
+void TransferFunction::drawHistogram(const Volume3D& volume) const
 {
-    auto& histogram = volume->getHistogram();
+    auto& histogram = volume.getHistogram();
     ui::PushItemWidth(-1);
     ui::PlotHistogram("##histogram", histogram.data(), histogram.size(), 0, nullptr, 0.0f, 1.0f, ImVec2(520, 120));
     ui::PopItemWidth();
 }
 
-void TransferFunction::drawUi(bool& open)
+void TransferFunction::drawUi(bool& open, const Volume3D& volume)
 {
     if (!ui::Begin("Transfer Function", &open, ImGuiWindowFlags_AlwaysAutoResize))
     {
         ui::End();
     }
 
-    if (volume != nullptr)
-    {
-        drawHistogram();
-        drawControlPointsUi();
-        drawControlPointCreationUi();
-    }
+    drawHistogram(volume);
+    drawControlPointsUi();
+    drawControlPointCreationUi();
 
     ui::End();
 }
@@ -332,7 +300,7 @@ void TransferFunction::drawUi(bool& open)
 void TransferFunction::addColorPoint(const vec3& color, const int isoValue)
 {
     // inserted point is off limits
-    if (isoValue <= 0 || isoValue >= colorPoints.back().getIsoValue())
+    if (isoValue <= 0 || isoValue >= colorPoints.back().getIsoValue() || colorPoints.size() > 255)
     {
         return;
     }
@@ -340,13 +308,13 @@ void TransferFunction::addColorPoint(const vec3& color, const int isoValue)
     auto ctrlP = TransferFunctionColorPoint(color, isoValue);
     // sorted insert
     colorPoints.insert(upper_bound(colorPoints.begin(), colorPoints.end(), ctrlP), ctrlP);
-    updateSplines();
+    updateFunction();
 }
 
 void TransferFunction::addAlphaPoint(const float alpha, const int isoValue)
 {
     // inserted point is off limits
-    if (isoValue <= 0 || isoValue >= alphaPoints.back().getIsoValue())
+    if (isoValue <= 0 || isoValue >= alphaPoints.back().getIsoValue() || colorPoints.size() > 255)
     {
         return;
     }
@@ -354,7 +322,7 @@ void TransferFunction::addAlphaPoint(const float alpha, const int isoValue)
     auto ctrlP = TransferFunctionAlphaPoint(alpha, isoValue);
     // sorted insert
     alphaPoints.insert(upper_bound(alphaPoints.begin(), alphaPoints.end(), ctrlP), ctrlP);
-    updateSplines();
+    updateFunction();
 }
 
 void TransferFunction::removeColorPoint(const int isoValue)
@@ -370,7 +338,7 @@ void TransferFunction::removeColorPoint(const int isoValue)
                                      {
                                          return p.getIsoValue() == isoValue;
                                      }));
-    updateSplines();
+    updateFunction();
 }
 
 void TransferFunction::removeAlphaPoint(const int isoValue)
@@ -386,7 +354,7 @@ void TransferFunction::removeAlphaPoint(const int isoValue)
                                      {
                                          return p.getIsoValue() == isoValue;
                                      }));
-    updateSplines();
+    updateFunction();
 }
 
 TransferFunction::Cubic::Cubic(vec3 a, vec3 b, vec3 c, vec3 d)
@@ -402,28 +370,23 @@ vec3 TransferFunction::Cubic::getPointOnSpline(float s) const
     return (((d * s) + c) * s + b) * s + a;
 }
 
-void TransferFunction::setVolume(const Volume3D& volume)
+void TransferFunction::updateFunction()
 {
-    this->volume = &volume;
-}
+    std::vector<vec3> alphaCtrPoints(alphaPoints.size());
+    std::vector<vec3> colorCtrPoints(colorPoints.size());
 
-void TransferFunction::updateSplines()
-{
-    std::vector<vec3> alphaCtrPoints;
-    std::vector<vec3> colorCtrPoints;
-
-    for (auto& val : alphaPoints)
+    for (int i = 0; i < alphaCtrPoints.size(); i++)
     {
-        alphaCtrPoints.push_back(vec3(val.getAlpha()));
+        alphaCtrPoints[i] = vec3(alphaPoints[i].getAlpha());
     }
 
-    for (auto& val : colorPoints)
+    for (int i = 0; i < colorCtrPoints.size(); i++)
     {
-        colorCtrPoints.push_back(vec3(val.getColor()));
+        colorCtrPoints[i] = colorPoints[i].getColor();
     }
 
-    alphaSpline = calculateCubicSpline(alphaCtrPoints);
-    colorSpline = calculateCubicSpline(colorCtrPoints);
+    alphaSpline = move(calculateCubicSpline(alphaCtrPoints));
+    colorSpline = move(calculateCubicSpline(colorCtrPoints));
 
     for (int i = 0; i < indexedTransferFunction.size(); i++)
     {
@@ -475,4 +438,9 @@ vec4 TransferFunction::getColor(const float t)
     }
 
     return vec4(color.r, color.g, color.b, alpha);
+}
+
+const cinder::gl::Texture1dRef &TransferFunction::get1DTexture() const
+{
+    return transferFunctionTexture;
 }

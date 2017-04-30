@@ -271,7 +271,7 @@ void Volume3D::drawVolume() const
 template<typename T, typename>
 void Volume3D::extractHistogram(std::vector<T> volume)
 {
-    std::vector<uint32_t> histogramData(256);
+    std::array<uint32_t, 256> histogramData = { 0 };
     // create shader storage buffer
     histogramSsbo = gl::Ssbo::create(256 * sizeof(uint32_t), histogramData.data(), GL_DYNAMIC_COPY);
     histogramSsbo->bindBase(1);
@@ -297,13 +297,13 @@ void Volume3D::extractHistogram(std::vector<T> volume)
     auto maxValue = max_element(histogramData.begin(), histogramData.end());
 
     // normalize and insert values
-    for(auto &val : histogramData)
+    for(int i = 0; i < 256; i++)
     {
-        histogram.push_back(static_cast<float>(val) / *maxValue);
+        histogram[i] = static_cast<float>(histogramData[i]) / *maxValue;
     }
 }
 
-const std::vector<float>& Volume3D::getHistogram() const
+const std::array<float, 256>& Volume3D::getHistogram() const
 {
     return histogram;
 }
