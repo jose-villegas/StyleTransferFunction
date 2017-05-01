@@ -66,4 +66,9 @@
     <None Include="shaders\gradients.comp" />
     <None Include="shaders\smooth_gradients.comp" />
   </ItemGroup>
+  <ItemGroup>
+    <Image Include="images\noise.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+  </ItemGroup>
 </Project>

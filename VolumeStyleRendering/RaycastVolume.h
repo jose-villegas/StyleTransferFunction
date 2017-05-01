@@ -52,6 +52,7 @@ private:
     cinder::gl::GlslProgRef smoothGradientsCompute;
 
     // raycast parameters
+    cinder::gl::Texture2dRef noiseTexture;
     glm::vec3 dimensions;
     glm::vec3 stepSize;
     glm::vec3 aspectRatios;

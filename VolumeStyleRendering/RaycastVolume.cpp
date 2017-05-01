@@ -23,7 +23,13 @@ RaycastVolume::RaycastVolume() : aspectRatios(1), scaleFactor(vec3(1)), stepScal
         .compute(loadFile("shaders/gradients.comp")));
     smoothGradientsCompute = gl::GlslProg::create(gl::GlslProg::Format()
         .compute(loadFile("shaders/smooth_gradients.comp")));
-
+    // noise texture to reduce volume banding artifacts
+    noiseTexture = gl::Texture2d::create(loadImage("images/noise.png"), gl::Texture2d::Format()
+                                         .wrapS(GL_REPEAT)
+                                         .wrapT(GL_REPEAT)
+                                         .wrapR(GL_REPEAT)
+                                         .magFilter(GL_NEAREST)
+                                         .minFilter(GL_NEAREST));
     // create clockwise bbox for volume rendering
     createCubeVbo();
     // create frame buffer object
@@ -267,6 +273,7 @@ void RaycastVolume::drawVolume() const
         volumeTexture->bind(2);
         gradientTexture->bind(3);
         transferFunction->get1DTexture()->bind(4);
+        noiseTexture->bind(5);
         // raycast parameters
         raycastShader->uniform("threshold", transferFunction->getThreshold());
         raycastShader->uniform("scaleFactor", scaleFactor);

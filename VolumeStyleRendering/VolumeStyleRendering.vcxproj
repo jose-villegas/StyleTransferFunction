@@ -161,6 +161,9 @@
     <None Include="shaders\raycast.vert" />
     <None Include="shaders\smooth_gradients.comp" />
   </ItemGroup>
+  <ItemGroup>
+    <Image Include="images\noise.png" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
