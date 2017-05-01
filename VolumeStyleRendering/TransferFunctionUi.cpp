@@ -98,9 +98,9 @@ void TransferFunctionUi::drawControlPointsUi()
     for (int i = 0; i < indexedTransferFunction.size() - 1; i++)
     {
         auto aBegin = clamp(1.0f - getColor(i).a, 0.0f, 1.0f);
-        auto aEnd = clamp(1.0f - getColor(i).a, 0.0f, 1.0f);
+        auto aEnd = clamp(1.0f - getColor(i + 1).a, 0.0f, 1.0f);
         drawList->AddLine(ImVec2(p.x + step * i + 4.0f, y - 124.0f + aBegin * 120),
-                          ImVec2(p.x + step * (i + 1) + 4.0f, y - 124.0f + aEnd * 120), white, 1);
+                          ImVec2(p.x + step * (i + 1) + 4.0f, y - 124.0f + aEnd * 120), white, 2);
     }
 
     for (auto& alphaP : alphaPoints)

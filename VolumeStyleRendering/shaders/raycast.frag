@@ -11,7 +11,7 @@ in vec4 position;
 out vec4 fragmentColor;
 
 // Spheremap Transform for normal encoding. Used in Cry Engine 3, presented by 
-// Martin Mittring in "A bit more Deferred" 
+// Martin Mittring in "A bit more Deferred", p. 13
 // http://www.crytek.com/sites/default/files/A_bit_more_deferred_-_CryEngine3.ppt
 vec3 decode (vec2 enc)
 {
