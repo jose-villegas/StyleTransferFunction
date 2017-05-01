@@ -5,7 +5,7 @@
 using namespace ci;
 using namespace glm;
 
-RaycastVolume::RaycastVolume() : aspectRatios(1), scaleFactor(vec3(1)), stepScale(1)
+RaycastVolume::RaycastVolume() : aspectRatios(1), scaleFactor(vec3(1)), stepScale(1), enableDiffuseShading(true)
 {
     // positions shader
     positionsShader = gl::GlslProg::create(gl::GlslProg::Format()
@@ -21,6 +21,8 @@ RaycastVolume::RaycastVolume() : aspectRatios(1), scaleFactor(vec3(1)), stepScal
     // gradient computation
     gradientsCompute = gl::GlslProg::create(gl::GlslProg::Format()
         .compute(loadFile("shaders/gradients.comp")));
+    smoothGradientsCompute = gl::GlslProg::create(gl::GlslProg::Format()
+        .compute(loadFile("shaders/smooth_gradients.comp")));
 
     // create clockwise bbox for volume rendering
     createCubeVbo();
@@ -124,7 +126,7 @@ void RaycastVolume::readVolumeFromFile8(const std::string filepath)
                                              .wrapR(GL_CLAMP_TO_BORDER)
                                              .wrapT(GL_CLAMP_TO_BORDER);
         format.setDataType(GL_UNSIGNED_BYTE);
-        format.setInternalFormat(GL_R8);
+        format.setInternalFormat(GL_RED);
         format.setSwizzleMask(GL_RED, GL_RED, GL_RED, GL_RED);
         volumeTexture = gl::Texture3d::create(buffer.data(), GL_RED, dimensions.x, dimensions.y, dimensions.z, format);
         // finally has drawable data
@@ -157,7 +159,7 @@ void RaycastVolume::readVolumeFromFile16(const std::string filepath)
                                              .wrapR(GL_CLAMP_TO_BORDER)
                                              .wrapT(GL_CLAMP_TO_BORDER);
         format.setDataType(GL_UNSIGNED_SHORT);
-        format.setInternalFormat(GL_R16);
+        format.setInternalFormat(GL_RED);
         format.setSwizzleMask(GL_RED, GL_RED, GL_RED, GL_RED);
         volumeTexture = gl::Texture3d::create(buffer.data(), GL_RED, dimensions.x, dimensions.y, dimensions.z, format);
         // finally has drawable data
@@ -270,6 +272,7 @@ void RaycastVolume::drawVolume() const
         raycastShader->uniform("scaleFactor", scaleFactor);
         raycastShader->uniform("stepSize", stepSize * stepScale);
         raycastShader->uniform("iterations", static_cast<int>(maxSize * (1.0f / stepScale) * 2.0f));
+        raycastShader->uniform("diffuseShading", enableDiffuseShading);
         // draw cube
         gl::ScopedBlend blend(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         vertexArrayObject->bind();
@@ -326,8 +329,16 @@ void RaycastVolume::generateGradients()
     {
         gradientsCompute->bind();
         // pass textures
-        volumeTexture->bind(0);
+        glBindImageTexture(0, volumeTexture->getId(), 0, true, 0, GL_READ_ONLY, GL_R8UI);
         glBindImageTexture(1, gradientTexture->getId(), 0, true, 0, GL_WRITE_ONLY, GL_RG16F);
+        // compute gradients
+        gl::dispatchCompute(ceil(dimensions.x / 8), ceil(dimensions.y / 8), ceil(dimensions.z / 8));
+    }
+    // smooth gradients
+    {
+        smoothGradientsCompute->bind();
+        // pass textures
+        glBindImageTexture(0, gradientTexture->getId(), 0, true, 0, GL_READ_WRITE, GL_RG16F);
         // compute gradients
         gl::dispatchCompute(ceil(dimensions.x / 8), ceil(dimensions.y / 8), ceil(dimensions.z / 8));
     }
@@ -341,4 +352,9 @@ const std::array<float, 256> &RaycastVolume::getHistogram() const
 void RaycastVolume::setTransferFunction(const std::shared_ptr<TransferFunction>& transferFunction)
 {
     this->transferFunction = transferFunction;
+}
+
+void RaycastVolume::diffuseShading(bool enable)
+{
+    this->enableDiffuseShading = enable;
 }

@@ -12,7 +12,7 @@ void TransferFunctionUi::drawThresholdControl()
     ImU32 gray = ImColor(0.5f, 0.5f, 0.5f, 0.5f);
     float x = p.x;
     float y = p.y - 35.0f - 4.0f;
-    float steps = width / 256;
+    float steps = width / 255;
     ImGuiStyle& style = ui::GetStyle();
 
     if (threshold.x > 0)
@@ -28,7 +28,7 @@ void TransferFunctionUi::drawThresholdControl()
     // draw threshold controls
     ui::BeginGroup();
     auto tThreshold = threshold;
-    ui::PushItemWidth(520);
+    ui::PushItemWidth(-2.0f);
 
     if (ui::SliderInt2("##Threshold", value_ptr(tThreshold), 0, 255))
     {
@@ -111,7 +111,7 @@ void TransferFunctionUi::drawControlPointsUi()
         drawList->AddCircle(ImVec2(p.x + step * alphaP.getIsoValue() + 4.0f, y - 124.0f + alpha * 120), 5, black, 24);
     }
 
-    ui::Dummy(ImVec2(ui::GetContentRegionAvailWidth(), sz + 15.0f));
+    ui::Dummy(ImVec2(width, sz + 15.0f));
 }
 
 void TransferFunctionUi::drawControlPointList(int pointType)

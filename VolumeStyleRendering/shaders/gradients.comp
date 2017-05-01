@@ -1,7 +1,7 @@
 #version 430
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
 
-layout(binding=0) uniform sampler3D volumeDensity;
+layout(binding=0, r8ui) uniform readonly uimage3D volume;
 layout(binding=1, rg16f) uniform writeonly image3D gradients;
 
 // Spheremap Transform for normal encoding. Used in Cry Engine 3, presented by 
@@ -18,14 +18,14 @@ void main()
     vec3 s1 = vec3(0); 
     vec3 s2 = s1;
 
-    s1.x = texelFetch(volumeDensity, ivec3(pos.x - 1, pos.y, pos.z), 0).x;
-    s2.x = texelFetch(volumeDensity, ivec3(pos.x + 1, pos.y, pos.z), 0).x;
+    s1.x = imageLoad(volume, ivec3(pos.x - 1, pos.y, pos.z)).r;
+    s2.x = imageLoad(volume, ivec3(pos.x + 1, pos.y, pos.z)).r;
 
-    s1.y = texelFetch(volumeDensity, ivec3(pos.x, pos.y - 1, pos.z), 0).x;
-    s2.y = texelFetch(volumeDensity, ivec3(pos.x, pos.y + 1, pos.z), 0).x;
+    s1.y = imageLoad(volume, ivec3(pos.x, pos.y - 1, pos.z)).r;
+    s2.y = imageLoad(volume, ivec3(pos.x, pos.y + 1, pos.z)).r;
 
-    s1.z = texelFetch(volumeDensity, ivec3(pos.x, pos.y, pos.z - 1), 0).x;
-    s2.z = texelFetch(volumeDensity, ivec3(pos.x, pos.y, pos.z + 1), 0).x;
+    s1.z = imageLoad(volume, ivec3(pos.x, pos.y, pos.z - 1)).r;
+    s2.z = imageLoad(volume, ivec3(pos.x, pos.y, pos.z + 1)).r;
 
     imageStore(gradients, pos, encode(normalize(s2 - s1)));
 }

@@ -17,6 +17,7 @@ public:
     void setAspectratios(const glm::vec3& value);
     const std::array<float, 256> &getHistogram() const;
     void setTransferFunction(const std::shared_ptr<TransferFunction> &transferFunction);
+    void diffuseShading(bool enable);
 private:
     // histogram data
     std::array<float, 256> histogram;
@@ -48,6 +49,7 @@ private:
     cinder::gl::SsboRef histogramSsbo;
     cinder::gl::GlslProgRef histogramCompute;
     cinder::gl::GlslProgRef gradientsCompute;
+    cinder::gl::GlslProgRef smoothGradientsCompute;
 
     // raycast parameters
     glm::vec3 dimensions;
@@ -56,6 +58,7 @@ private:
     glm::vec3 scaleFactor;
     float stepScale;
     float maxSize;
+    bool enableDiffuseShading;
 
     bool isDrawable;
 

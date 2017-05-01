@@ -92,6 +92,7 @@ void VolumeRenderingApp::renderingOptionsUi(bool& showRendering)
         ui::Begin("Rendering", &showRendering, ImGuiWindowFlags_AlwaysAutoResize);
         static float stepScale = volume.getStepScale();
         static vec3 aspectRatios = volume.getAspectRatios();
+        static bool doShading = true;
         stepScale = volume.getStepScale();
         aspectRatios = volume.getAspectRatios();
 
@@ -109,6 +110,11 @@ void VolumeRenderingApp::renderingOptionsUi(bool& showRendering)
             camera.lookAt(eye, volume.centerPoint(), camera.getWorldUp());
             dragStart = vec2(0);
             initialCamera = camera;
+        }
+
+        if(ui::Checkbox("Enable Diffuse Shading", &doShading))
+        {
+            volume.diffuseShading(doShading);
         }
 
         ui::End();

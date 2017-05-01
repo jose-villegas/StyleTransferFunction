@@ -64,5 +64,6 @@
     <None Include="shaders\raycast.frag" />
     <None Include="shaders\histogram.comp" />
     <None Include="shaders\gradients.comp" />
+    <None Include="shaders\smooth_gradients.comp" />
   </ItemGroup>
 </Project>

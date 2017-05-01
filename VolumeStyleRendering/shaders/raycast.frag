@@ -7,6 +7,7 @@ layout(binding=4) uniform sampler1D transferFunction;
 uniform ivec2 threshold;
 uniform vec3 stepSize;
 uniform int iterations;
+uniform bool diffuseShading;
 in vec4 position;
 out vec4 fragmentColor;
 
@@ -56,9 +57,12 @@ void main(void)
             // assigned color from transfer function for this density
             src = texture(transferFunction, value.a);
 
-            // diffuse shading + fake ambient light
-            float s = dot(value.xyz, L);
-            src.rgb = s * src.rgb + 0.1f * src.rgb;
+            if(diffuseShading)
+            {
+                // diffuse shading + fake ambient light
+                float s = dot(value.xyz, L);
+                src.rgb = s * src.rgb + 0.1f * src.rgb;
+            }
 
             // front to back blending
             src.rgb *= src.a;
