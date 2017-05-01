@@ -1,4 +1,4 @@
-#version 400
+#version 420
 uniform mat4 ciModelViewProjection;
 uniform vec3 scaleFactor;
 layout(location = 0) in vec3 v_position;

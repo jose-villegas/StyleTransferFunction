@@ -1,10 +1,11 @@
-#include "Volume3D.h"
+#include "RaycastVolume.h"
 #include <cinder/app/AppBase.h>
 #include <cinder/Log.h>
+#include "TransferFunction.h"
 using namespace ci;
 using namespace glm;
 
-Volume3D::Volume3D() : aspectRatios(1), scaleFactor(vec3(1)), stepScale(1)
+RaycastVolume::RaycastVolume() : aspectRatios(1), scaleFactor(vec3(1)), stepScale(1)
 {
     // positions shader
     positionsShader = gl::GlslProg::create(gl::GlslProg::Format()
@@ -17,6 +18,9 @@ Volume3D::Volume3D() : aspectRatios(1), scaleFactor(vec3(1)), stepScale(1)
     // histogram calculation 
     histogramCompute = gl::GlslProg::create(gl::GlslProg::Format()
         .compute(loadFile("shaders/histogram.comp")));
+    // gradient computation
+    gradientsCompute = gl::GlslProg::create(gl::GlslProg::Format()
+        .compute(loadFile("shaders/gradients.comp")));
 
     // create clockwise bbox for volume rendering
     createCubeVbo();
@@ -24,36 +28,36 @@ Volume3D::Volume3D() : aspectRatios(1), scaleFactor(vec3(1)), stepScale(1)
     createFbos();
 }
 
-Volume3D::~Volume3D() {}
+RaycastVolume::~RaycastVolume() {}
 
-const vec3 Volume3D::centerPoint() const
+vec3 RaycastVolume::centerPoint() const
 {
     return vec3(0.5) * scaleFactor;
 }
 
-const float &Volume3D::getStepScale() const
+const float &RaycastVolume::getStepScale() const
 {
     return stepScale;
 }
 
-void Volume3D::setStepScale(const float& value)
+void RaycastVolume::setStepScale(const float& value)
 {
-    stepScale = max(value, 0.01f);
+    stepScale = max(value, 0.1f);
 }
 
-const vec3 &Volume3D::getAspectRatios() const
+const vec3 &RaycastVolume::getAspectRatios() const
 {
     return aspectRatios;
 }
 
-void Volume3D::setAspectratios(const vec3& value)
+void RaycastVolume::setAspectratios(const vec3& value)
 {
     aspectRatios = max(value, vec3(0));
     // volume scale
     scaleFactor = vec3(1) / ((vec3(1) * maxSize) / (dimensions * aspectRatios));
 }
 
-void Volume3D::createCubeVbo()
+void RaycastVolume::createCubeVbo()
 {
     GLfloat vertices[24] =
     {
@@ -97,7 +101,7 @@ void Volume3D::createCubeVbo()
     indicesBuffer->bind();
 }
 
-void Volume3D::readVolumeFromFile8(const vec3& dimensions, const std::string filepath)
+void RaycastVolume::readVolumeFromFile8(const std::string filepath)
 {
     // open file and read
     std::ifstream file(filepath, std::ios::binary | std::ios::ate);
@@ -116,22 +120,21 @@ void Volume3D::readVolumeFromFile8(const vec3& dimensions, const std::string fil
         // create 3D texture
         auto format = gl::Texture3d::Format().magFilter(GL_LINEAR)
                                              .minFilter(GL_LINEAR)
-                                             .wrapS(GL_CLAMP_TO_EDGE)
-                                             .wrapR(GL_CLAMP_TO_EDGE)
-                                             .wrapT(GL_CLAMP_TO_EDGE);
+                                             .wrapS(GL_CLAMP_TO_BORDER)
+                                             .wrapR(GL_CLAMP_TO_BORDER)
+                                             .wrapT(GL_CLAMP_TO_BORDER);
         format.setDataType(GL_UNSIGNED_BYTE);
-        format.setInternalFormat(GL_RED);
+        format.setInternalFormat(GL_R8);
+        format.setSwizzleMask(GL_RED, GL_RED, GL_RED, GL_RED);
         volumeTexture = gl::Texture3d::create(buffer.data(), GL_RED, dimensions.x, dimensions.y, dimensions.z, format);
         // finally has drawable data
         isDrawable = true;
-
-        extractHistogram(buffer);
     }
 
     file.close();
 }
 
-void Volume3D::readVolumeFromFile16(const vec3& dimensions, const std::string filepath)
+void RaycastVolume::readVolumeFromFile16(const std::string filepath)
 {
     // open file and read
     std::ifstream file(filepath, std::ios::binary | std::ios::ate);
@@ -150,22 +153,21 @@ void Volume3D::readVolumeFromFile16(const vec3& dimensions, const std::string fi
         // create 3D texture
         auto format = gl::Texture3d::Format().magFilter(GL_LINEAR)
                                              .minFilter(GL_LINEAR)
-                                             .wrapS(GL_CLAMP_TO_EDGE)
-                                             .wrapR(GL_CLAMP_TO_EDGE)
-                                             .wrapT(GL_CLAMP_TO_EDGE);
+                                             .wrapS(GL_CLAMP_TO_BORDER)
+                                             .wrapR(GL_CLAMP_TO_BORDER)
+                                             .wrapT(GL_CLAMP_TO_BORDER);
         format.setDataType(GL_UNSIGNED_SHORT);
-        format.setInternalFormat(GL_RED);
+        format.setInternalFormat(GL_R16);
+        format.setSwizzleMask(GL_RED, GL_RED, GL_RED, GL_RED);
         volumeTexture = gl::Texture3d::create(buffer.data(), GL_RED, dimensions.x, dimensions.y, dimensions.z, format);
         // finally has drawable data
         isDrawable = true;
-
-        extractHistogram(buffer);
     }
 
     file.close();
 }
 
-void Volume3D::createFbos()
+void RaycastVolume::createFbos()
 {
     gl::Fbo::Format format = gl::Fbo::Format();
     format.colorTexture(gl::Texture::Format().wrapS(GL_REPEAT)
@@ -191,20 +193,24 @@ void Volume3D::createFbos()
     CI_CHECK_GL();
 }
 
-void Volume3D::createFromFile(const vec3& dimensions, const vec3& ratios, const std::string filepath, bool is16Bits)
+void RaycastVolume::loadFromFile(const vec3& dimensions, const vec3& ratios, const std::string filepath, bool is16Bits)
 {
-    // create volume texture
-    is16Bits ? readVolumeFromFile16(dimensions, filepath) : readVolumeFromFile8(dimensions, filepath);
     // compute step size and number of iterations for the given volume dimensions
+    this->dimensions = dimensions;
     maxSize = max(dimensions.x, max(dimensions.y, dimensions.z));
     stepSize = vec3(1.0f / (dimensions.x * (maxSize / dimensions.x)),
                     1.0f / (dimensions.y * (maxSize / dimensions.y)),
                     1.0f / (dimensions.z * (maxSize / dimensions.z)));
-    this->dimensions = dimensions;
     setAspectratios(ratios);
+    // create volume texture
+    is16Bits ? readVolumeFromFile16(filepath) : readVolumeFromFile8(filepath);
+    // histogram compute
+    extractHistogram();
+    // gradients
+    generateGradients();
 }
 
-void Volume3D::drawFrontCubeFace() const
+void RaycastVolume::drawFrontCubeFace() const
 {
     if (!isDrawable) return;
 
@@ -215,7 +221,7 @@ void Volume3D::drawFrontCubeFace() const
     gl::disable(GL_CULL_FACE);
 }
 
-void Volume3D::drawBackCubeFace() const
+void RaycastVolume::drawBackCubeFace() const
 {
     if (!isDrawable) return;
 
@@ -226,52 +232,54 @@ void Volume3D::drawBackCubeFace() const
     gl::disable(GL_CULL_FACE);
 }
 
-void Volume3D::drawVolume() const
+void RaycastVolume::drawVolume() const
 {
     if (!isDrawable) return;
 
     // draw front face cube positions to render target
-    frontFbo->bindFramebuffer(GL_DRAW_FRAMEBUFFER);
-    gl::clear();
-    positionsShader->bind();
-    positionsShader->uniform("scaleFactor", scaleFactor);
-    gl::setDefaultShaderVars();
-    drawFrontCubeFace();
-    frontFbo->unbindFramebuffer();
-    // draw back face cube positions to render target
-    backFbo->bindFramebuffer(GL_DRAW_FRAMEBUFFER);
-    gl::clear();
-    drawBackCubeFace();
-    backFbo->unbindFramebuffer();
-    // raycast volume
-    gl::clear();
-    raycastShader->bind();
-    // scale volume
-    gl::setDefaultShaderVars();
-    // bind front and back cube textures
-    frontFbo->getTexture2d(GL_COLOR_ATTACHMENT0)->bind(0);
-    raycastShader->uniform("cubeFront", 0);
-    backFbo->getTexture2d(GL_COLOR_ATTACHMENT0)->bind(1);
-    raycastShader->uniform("cubeBack", 1);
-    // bind volume data texture
-    volumeTexture->bind(2);
-    raycastShader->uniform("volume", 2);
-    // raycast parameters
-    raycastShader->uniform("scaleFactor", scaleFactor);
-    raycastShader->uniform("stepSize", stepSize * stepScale);
-    raycastShader->uniform("iterations", static_cast<int>(maxSize * (1.0f / stepScale) * 2.0f));
-    // draw cube
     {
+        frontFbo->bindFramebuffer(GL_DRAW_FRAMEBUFFER);
+        gl::clear();
+        positionsShader->bind();
+        positionsShader->uniform("scaleFactor", scaleFactor);
+        gl::setDefaultShaderVars();
+        drawFrontCubeFace();
+        frontFbo->unbindFramebuffer();
+    }
+    // draw back face cube positions to render target
+    {
+        backFbo->bindFramebuffer(GL_DRAW_FRAMEBUFFER);
+        gl::clear();
+        drawBackCubeFace();
+        backFbo->unbindFramebuffer();
+    }
+    // raycast volume
+    {
+        gl::clear();
+        raycastShader->bind();
+        // scale volume
+        gl::setDefaultShaderVars();
+        // bind  textures
+        frontFbo->getTexture2d(GL_COLOR_ATTACHMENT0)->bind(0);
+        backFbo->getTexture2d(GL_COLOR_ATTACHMENT0)->bind(1);
+        volumeTexture->bind(2);
+        gradientTexture->bind(3);
+        transferFunction->get1DTexture()->bind(4);
+        // raycast parameters
+        raycastShader->uniform("threshold", transferFunction->getThreshold());
+        raycastShader->uniform("scaleFactor", scaleFactor);
+        raycastShader->uniform("stepSize", stepSize * stepScale);
+        raycastShader->uniform("iterations", static_cast<int>(maxSize * (1.0f / stepScale) * 2.0f));
+        // draw cube
         gl::ScopedBlend blend(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         vertexArrayObject->bind();
         gl::drawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, static_cast<GLuint *>(nullptr));
     }
 }
 
-template<typename T, typename>
-void Volume3D::extractHistogram(std::vector<T> volume)
+void RaycastVolume::extractHistogram()
 {
-    std::array<uint32_t, 256> histogramData = { 0 };
+    std::array<uint32_t, 256> histogramData = {0};
     // create shader storage buffer
     histogramSsbo = gl::Ssbo::create(256 * sizeof(uint32_t), histogramData.data(), GL_DYNAMIC_COPY);
     histogramSsbo->bindBase(1);
@@ -297,13 +305,40 @@ void Volume3D::extractHistogram(std::vector<T> volume)
     auto maxValue = max_element(histogramData.begin(), histogramData.end());
 
     // normalize and insert values
-    for(int i = 0; i < 256; i++)
+    for (int i = 0; i < 256; i++)
     {
         histogram[i] = static_cast<float>(histogramData[i]) / *maxValue;
     }
 }
 
-const std::array<float, 256>& Volume3D::getHistogram() const
+void RaycastVolume::generateGradients()
+{
+    auto format = gl::Texture3d::Format().magFilter(GL_LINEAR)
+                                         .minFilter(GL_LINEAR)
+                                         .wrapS(GL_CLAMP_TO_BORDER)
+                                         .wrapR(GL_CLAMP_TO_BORDER)
+                                         .wrapT(GL_CLAMP_TO_BORDER)
+                                         .internalFormat(GL_RG16F);
+    format.setDataType(GL_FLOAT);
+    gradientTexture = gl::Texture3d::create(dimensions.x, dimensions.y, dimensions.z, format);
+
+    // compute gradients
+    {
+        gradientsCompute->bind();
+        // pass textures
+        volumeTexture->bind(0);
+        glBindImageTexture(1, gradientTexture->getId(), 0, true, 0, GL_WRITE_ONLY, GL_RG16F);
+        // compute gradients
+        gl::dispatchCompute(ceil(dimensions.x / 8), ceil(dimensions.y / 8), ceil(dimensions.z / 8));
+    }
+}
+
+const std::array<float, 256> &RaycastVolume::getHistogram() const
 {
     return histogram;
+}
+
+void RaycastVolume::setTransferFunction(const std::shared_ptr<TransferFunction>& transferFunction)
+{
+    this->transferFunction = transferFunction;
 }

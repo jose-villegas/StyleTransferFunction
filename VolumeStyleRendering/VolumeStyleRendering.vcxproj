@@ -142,15 +142,18 @@
     <ClCompile Include="external\Cinder-ImGui\src\CinderImGui.cpp" />
     <ClCompile Include="TransferFunction.cpp" />
     <ClCompile Include="TransferFunctionPoint.cpp" />
-    <ClCompile Include="Volume3D.cpp" />
+    <ClCompile Include="TransferFunctionUi.cpp" />
+    <ClCompile Include="RaycastVolume.cpp" />
     <ClCompile Include="VolumeRenderingApp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TransferFunction.h" />
     <ClInclude Include="TransferFunctionPoint.h" />
-    <ClInclude Include="Volume3D.h" />
+    <ClInclude Include="TransferFunctionUi.h" />
+    <ClInclude Include="RaycastVolume.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="shaders\gradients.comp" />
     <None Include="shaders\histogram.comp" />
     <None Include="shaders\positions.frag" />
     <None Include="shaders\positions.vert" />

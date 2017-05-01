@@ -30,24 +30,30 @@
     <ClCompile Include="external\Cinder-ImGui\lib\imgui\imgui_draw.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Volume3D.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="TransferFunctionPoint.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="TransferFunction.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="TransferFunctionUi.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="RaycastVolume.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Volume3D.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="TransferFunctionPoint.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="TransferFunction.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TransferFunctionUi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RaycastVolume.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -57,5 +63,6 @@
     <None Include="shaders\raycast.vert" />
     <None Include="shaders\raycast.frag" />
     <None Include="shaders\histogram.comp" />
+    <None Include="shaders\gradients.comp" />
   </ItemGroup>
 </Project>

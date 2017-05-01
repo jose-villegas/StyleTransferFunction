@@ -1,7 +1,6 @@
 #pragma once
 #include "TransferFunctionPoint.h"
-
-class Volume3D;
+class RaycastVolume;
 
 class TransferFunction
 {
@@ -9,14 +8,16 @@ public:
     TransferFunction();
     ~TransferFunction();
     glm::vec4 getColor(const float t /* t=[0..1] */);
-    void drawUi(bool& open, const Volume3D& volume);
+    glm::vec4 getColor(const int isoValue /* isoValue=[0..255] */);
     void updateFunction();
     void addColorPoint(const glm::vec3& color, const int isoValue);
     void addAlphaPoint(const float alpha, const int isoValue);
     void removeColorPoint(const int isoValue);
     void removeAlphaPoint(const int isoValue);
+    void setThreshold(int minIso, int maxIso);
+    const glm::ivec2 &getThreshold() const;
     const cinder::gl::Texture1dRef &get1DTexture() const;
-private:
+protected:
     class Cubic
     {
     public:
@@ -31,18 +32,12 @@ private:
         glm::vec3 d;
     };
 
+    glm::ivec2 threshold;
     std::vector<TransferFunctionColorPoint> colorPoints;
     std::vector<TransferFunctionAlphaPoint> alphaPoints;
     std::vector<Cubic> alphaSpline;
     std::vector<Cubic> colorSpline;
     std::array<glm::vec4, 256> indexedTransferFunction;
     cinder::gl::Texture1dRef transferFunctionTexture;
-
-    void insertLimitPoints(const int limit);
-    void drawHistogram(const Volume3D& volume) const;
-    void drawControlPointsUi();
-    void drawControlPointCreationUi();
-    void drawControlPointList(int& pointType);
-
     static std::vector<Cubic> calculateCubicSpline(std::vector<glm::vec3> points);
 };
