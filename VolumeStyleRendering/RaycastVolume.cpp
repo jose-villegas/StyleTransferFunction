@@ -27,7 +27,6 @@ RaycastVolume::RaycastVolume() : aspectRatios(1), scaleFactor(vec3(1)), stepScal
     noiseTexture = gl::Texture2d::create(loadImage("images/noise.png"), gl::Texture2d::Format()
                                          .wrapS(GL_REPEAT)
                                          .wrapT(GL_REPEAT)
-                                         .wrapR(GL_REPEAT)
                                          .magFilter(GL_NEAREST)
                                          .minFilter(GL_NEAREST));
     // create clockwise bbox for volume rendering
@@ -279,7 +278,11 @@ void RaycastVolume::drawVolume() const
         raycastShader->uniform("scaleFactor", scaleFactor);
         raycastShader->uniform("stepSize", stepSize * stepScale);
         raycastShader->uniform("iterations", static_cast<int>(maxSize * (1.0f / stepScale) * 2.0f));
+        // lighting
         raycastShader->uniform("diffuseShading", enableDiffuseShading);
+        raycastShader->uniform("light.direction", light.direction);
+        raycastShader->uniform("light.ambient", light.ambient);
+        raycastShader->uniform("light.diffuse", light.diffuse);
         // draw cube
         gl::ScopedBlend blend(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         vertexArrayObject->bind();
@@ -364,4 +367,16 @@ void RaycastVolume::setTransferFunction(const std::shared_ptr<TransferFunction>&
 void RaycastVolume::diffuseShading(bool enable)
 {
     this->enableDiffuseShading = enable;
+}
+
+void RaycastVolume::setLight(vec3 direction, vec3 ambient, vec3 diffuse)
+{
+    light.direction = direction;
+    light.ambient = ambient;
+    light.diffuse = diffuse;
+}
+
+const Light& RaycastVolume::getLight() const
+{
+    return light;
 }

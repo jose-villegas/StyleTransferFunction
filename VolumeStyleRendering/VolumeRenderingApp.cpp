@@ -15,7 +15,7 @@ class VolumeRenderingApp : public App
 public:
     static void prepareSettings(Settings* settings);
     void setup() override;
-    void volumeParametersPopupUi(bool& showVolumeOptions, fs::path& path);
+    void volumeParametersPopupUi(fs::path& path);
     void renderingOptionsUi(bool& showRendering);
     void drawUi();
     void update() override;
@@ -29,7 +29,8 @@ private:
     RaycastVolume volume;
     CameraPersp camera;
     CameraPersp initialCamera;
-    float dragPivotDistance {0.0f};
+    float dragPivotDistance{0.0f};
+    quat rotation;
 };
 
 void VolumeRenderingApp::prepareSettings(Settings* settings)
@@ -48,9 +49,11 @@ void VolumeRenderingApp::setup()
     // pass transfer function ref
     transferFunctionUi = std::make_shared<TransferFunctionUi>();
     volume.setTransferFunction(transferFunctionUi);
+    // set camera initial setup
+    camera.lookAt(vec3(0, 0, -4), vec3(0), vec3(0, 1, 0));
 }
 
-void VolumeRenderingApp::volumeParametersPopupUi(bool& showVolumeOptions, fs::path& path)
+void VolumeRenderingApp::volumeParametersPopupUi(fs::path& path)
 {
     if (ui::BeginPopupModal("Volume Parameters", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
     {
@@ -73,11 +76,6 @@ void VolumeRenderingApp::volumeParametersPopupUi(bool& showVolumeOptions, fs::pa
         if (ui::Button("Load", ImVec2(ui::GetContentRegionAvailWidth(), 0)))
         {
             volume.loadFromFile(slices, ratios, path.string(), bits == 1);
-            // position camera looking at volume
-            camera.setEyePoint(volume.centerPoint() + vec3(0, 0, 2));
-            camera.lookAt(volume.centerPoint());
-            camera.setPivotDistance(2);
-            showVolumeOptions = true;
             ui::CloseCurrentPopup();
         }
 
@@ -92,7 +90,6 @@ void VolumeRenderingApp::renderingOptionsUi(bool& showRendering)
         ui::Begin("Rendering", &showRendering, ImGuiWindowFlags_AlwaysAutoResize);
         static float stepScale = volume.getStepScale();
         static vec3 aspectRatios = volume.getAspectRatios();
-        static bool doShading = true;
         stepScale = volume.getStepScale();
         aspectRatios = volume.getAspectRatios();
 
@@ -104,17 +101,6 @@ void VolumeRenderingApp::renderingOptionsUi(bool& showRendering)
         if (ui::InputFloat3("Aspect", value_ptr(aspectRatios)))
         {
             volume.setAspectratios(aspectRatios);
-            // update camera
-            auto eye = volume.centerPoint() + camera.getViewDirection() * camera.getPivotDistance();
-            camera.setEyePoint(eye);
-            camera.lookAt(eye, volume.centerPoint(), camera.getWorldUp());
-            dragStart = vec2(0);
-            initialCamera = camera;
-        }
-
-        if(ui::Checkbox("Enable Diffuse Shading", &doShading))
-        {
-            volume.diffuseShading(doShading);
         }
 
         ui::End();
@@ -126,7 +112,9 @@ void VolumeRenderingApp::drawUi()
     static bool loadNewVolume = false;
     static bool showVolumeOptions = false;
     static bool showRendering = false;
-    static bool showTransferFunction;
+    static bool showTransferFunction = false;
+    static bool showRotation = false;
+    static bool showLightingSetup;
     static fs::path path;
 
     // menu bar on top
@@ -149,8 +137,11 @@ void VolumeRenderingApp::drawUi()
 
         if (ui::BeginMenu("Volume", showVolumeOptions))
         {
+            ui::MenuItem("Rotate", nullptr, &showRotation);
             ui::MenuItem("Rendering", nullptr, &showRendering);
+            ui::MenuItem("Lighting", nullptr, &showLightingSetup);
             ui::MenuItem("Transfer Function", nullptr, &showTransferFunction);
+
             ui::EndMenu();
         }
     }
@@ -159,9 +150,55 @@ void VolumeRenderingApp::drawUi()
     if (loadNewVolume)
     {
         ui::OpenPopup("Volume Parameters");
+        showVolumeOptions = true;
     }
 
-    volumeParametersPopupUi(showVolumeOptions, path);
+    volumeParametersPopupUi(path);
+
+    if (showRotation)
+    {
+        static vec3 angles = vec3(0);
+        bool changed = false;
+        ui::Begin("Rotate", &showRotation, ImGuiWindowFlags_AlwaysAutoResize);
+        changed |= ui::SliderAngle("X", &angles.x);
+        changed |= ui::SliderAngle("Y", &angles.y);
+        changed |= ui::SliderAngle("Z", &angles.z);
+
+        if (changed)
+        {
+            rotation = toQuat(glm::eulerAngleXYZ(angles.x, angles.y, angles.z));
+        }
+
+        ui::End();
+    }
+
+    if (showLightingSetup)
+    {
+        static Light light = volume.getLight();
+        static vec3 rotation;
+        static bool doShading = true;
+        bool changed = false;
+        ui::Begin("Lighting", &showLightingSetup, ImGuiWindowFlags_AlwaysAutoResize);
+
+        if (ui::Checkbox("Enable Diffuse Shading", &doShading))
+        {
+            volume.diffuseShading(doShading);
+        }
+
+        changed |= ui::SliderFloat3("Rotation", value_ptr(rotation), -180, 180);
+        changed |= ui::DragFloat3("Ambient", value_ptr(light.ambient), 0.01, 0, 1);
+        changed |= ui::DragFloat3("Diffuse", value_ptr(light.diffuse), 0.01, 0, 1);
+
+        if (changed)
+        {
+            vec3 rads = radians(rotation);
+            light.direction = vec3(0, 0, 1) * mat3(glm::eulerAngleXYZ(rads.x, rads.y, rads.z));
+            volume.setLight(light.direction, light.ambient, light.diffuse);
+        }
+
+        ui::End();
+    }
+
     // volume controls
     renderingOptionsUi(showRendering);
     // transfer function ui
@@ -179,8 +216,17 @@ void VolumeRenderingApp::draw()
 {
     gl::clear();
     gl::setMatrices(camera);
-    // draw volumetric data
-    volume.drawVolume();
+
+    // volume raycasting
+    {
+        gl::ScopedModelMatrix modelMatrix;
+        // rotate around center
+        gl::rotate(rotation);
+        // center to origin
+        gl::translate(-volume.centerPoint());
+
+        volume.drawVolume();
+    }
 }
 
 void VolumeRenderingApp::mouseWheel(MouseEvent event)

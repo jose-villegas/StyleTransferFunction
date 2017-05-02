@@ -2,6 +2,13 @@
 #include "cinder/gl/gl.h"
 class TransferFunction;
 
+struct Light
+{
+    glm::vec3 direction {0.0f, 0.0f, 1.0f};
+    glm::vec3 diffuse {1.0f, 1.0f, 1.0f};
+    glm::vec3 ambient {0.1f, 0.1f, 0.1f};
+};
+
 class RaycastVolume
 {
 public:
@@ -18,6 +25,8 @@ public:
     const std::array<float, 256> &getHistogram() const;
     void setTransferFunction(const std::shared_ptr<TransferFunction> &transferFunction);
     void diffuseShading(bool enable);
+    void setLight(glm::vec3 direction, glm::vec3 ambient, glm::vec3 diffuse);
+    const Light &getLight() const;
 private:
     // histogram data
     std::array<float, 256> histogram;
@@ -44,6 +53,7 @@ private:
     // volume raycast
     cinder::gl::GlslProgRef raycastShader;
     std::shared_ptr<TransferFunction> transferFunction;
+    Light light;
 
     // compute shaders
     cinder::gl::SsboRef histogramSsbo;

@@ -1,14 +1,26 @@
 #version 420
+struct Light 
+{
+    vec3 direction;
+    vec3 ambient;
+    vec3 diffuse;
+};
+
 layout(binding=0) uniform sampler2D cubeFront;
 layout(binding=1) uniform sampler2D cubeBack;
 layout(binding=2) uniform sampler3D volume;
 layout(binding=3) uniform sampler3D gradients;
 layout(binding=4) uniform sampler1D transferFunction;
 layout(binding=5) uniform sampler2D bakedNoise;
+
+uniform mat3 ciModelMatrixInverseTranspose;
+uniform Light light;
+
 uniform ivec2 threshold;
 uniform vec3 stepSize;
 uniform int iterations;
 uniform bool diffuseShading;
+
 in vec4 position;
 out vec4 fragmentColor;
 
@@ -25,8 +37,6 @@ vec3 decode (vec2 enc)
 
 void main(void)
 {
-    vec3 L = vec3(0, 1, 1);
-
     vec2 texC = position.xy / position.w;
     texC.x = 0.5 * texC.x + 0.5;
     texC.y = 0.5 * texC.y - 0.5;
@@ -75,8 +85,10 @@ void main(void)
                 if(diffuseShading)
                 {
                     // diffuse shading + fake ambient light
-                    float s = dot(value.xyz, L);
-                    src.rgb = s * src.rgb + 0.1f * src.rgb;
+                    vec3 normal = normalize(ciModelMatrixInverseTranspose * value.xyz);
+                    vec3 lightDir = normalize(-light.direction);
+                    float lambert = max(dot(normal, lightDir), 0.0);
+                    src.rgb = light.diffuse * lambert * src.rgb + light.ambient * src.rgb;
                 }
 
                 // front to back blending
@@ -95,6 +107,10 @@ void main(void)
         if (pos.x > 1.0 || pos.y > 1.0 || pos.z > 1.0) 
             break;
     }
+
+     // apply gamma correction
+    float gamma = 2.2;
+    dst.rgb = pow(dst.rgb, vec3(1.0 / gamma));
 
     fragmentColor = dst;
 }
