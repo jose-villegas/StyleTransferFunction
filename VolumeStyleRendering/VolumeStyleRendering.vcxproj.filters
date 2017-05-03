@@ -56,6 +56,9 @@
     <ClInclude Include="RaycastVolume.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Light.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\positions.vert" />
@@ -65,6 +68,8 @@
     <None Include="shaders\histogram.comp" />
     <None Include="shaders\gradients.comp" />
     <None Include="shaders\smooth_gradients.comp" />
+    <None Include="shaders\raycast_gbuffer.frag" />
+    <None Include="shaders\light_buffer.frag" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="images\noise.png">

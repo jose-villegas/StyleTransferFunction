@@ -147,6 +147,7 @@
     <ClCompile Include="VolumeRenderingApp.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Light.h" />
     <ClInclude Include="TransferFunction.h" />
     <ClInclude Include="TransferFunctionPoint.h" />
     <ClInclude Include="TransferFunctionUi.h" />
@@ -155,10 +156,12 @@
   <ItemGroup>
     <None Include="shaders\gradients.comp" />
     <None Include="shaders\histogram.comp" />
+    <None Include="shaders\light_buffer.frag" />
     <None Include="shaders\positions.frag" />
     <None Include="shaders\positions.vert" />
     <None Include="shaders\raycast.frag" />
     <None Include="shaders\raycast.vert" />
+    <None Include="shaders\raycast_gbuffer.frag" />
     <None Include="shaders\smooth_gradients.comp" />
   </ItemGroup>
   <ItemGroup>

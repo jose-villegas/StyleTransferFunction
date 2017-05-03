@@ -20,6 +20,7 @@ public:
     void drawUi();
     void update() override;
     void draw() override;
+    void resize() override;
     void mouseWheel(MouseEvent event) override;
     void mouseDrag(MouseEvent event) override;
     void mouseDown(MouseEvent event) override;
@@ -30,15 +31,12 @@ private:
     CameraPersp camera;
     CameraPersp initialCamera;
     float dragPivotDistance{0.0f};
-    quat rotation;
+    bool useDeferredPath;
 };
 
 void VolumeRenderingApp::prepareSettings(Settings* settings)
 {
-    settings->setResizable(false);
     settings->setWindowSize(1280, 720);
-    // logging
-    log::makeLogger<log::LoggerFile>("log.txt");
 }
 
 void VolumeRenderingApp::setup()
@@ -90,6 +88,7 @@ void VolumeRenderingApp::renderingOptionsUi(bool& showRendering)
         ui::Begin("Rendering", &showRendering, ImGuiWindowFlags_AlwaysAutoResize);
         static float stepScale = volume.getStepScale();
         static vec3 aspectRatios = volume.getAspectRatios();
+        static int renderingPath = 0;
         stepScale = volume.getStepScale();
         aspectRatios = volume.getAspectRatios();
 
@@ -102,6 +101,11 @@ void VolumeRenderingApp::renderingOptionsUi(bool& showRendering)
         {
             volume.setAspectratios(aspectRatios);
         }
+
+        ui::RadioButton("Forward Rendering", &renderingPath, 0);
+        ui::RadioButton("Deferred Rendering", &renderingPath, 1);
+
+        useDeferredPath = renderingPath == 1;
 
         ui::End();
     }
@@ -166,7 +170,7 @@ void VolumeRenderingApp::drawUi()
 
         if (changed)
         {
-            rotation = toQuat(glm::eulerAngleXYZ(angles.x, angles.y, angles.z));
+            volume.setRotation(toQuat(glm::eulerAngleXYZ(angles.x, angles.y, angles.z)));
         }
 
         ui::End();
@@ -214,19 +218,23 @@ void VolumeRenderingApp::update()
 
 void VolumeRenderingApp::draw()
 {
-    gl::clear();
+    gl::viewport(ivec2(0), getWindowSize());
+    gl::enableDepthRead();
+    gl::enableDepthWrite();
     gl::setMatrices(camera);
 
     // volume raycasting
     {
-        gl::ScopedModelMatrix modelMatrix;
-        // rotate around center
-        gl::rotate(rotation);
-        // center to origin
-        gl::translate(-volume.centerPoint());
-
-        volume.drawVolume();
+        volume.setPosition(-volume.centerPoint());
+        volume.drawVolume(useDeferredPath);
     }
+}
+
+void VolumeRenderingApp::resize()
+{
+    camera.setAspectRatio(getWindowAspectRatio());
+    // update frame buffers
+    volume.resizeFbos();
 }
 
 void VolumeRenderingApp::mouseWheel(MouseEvent event)

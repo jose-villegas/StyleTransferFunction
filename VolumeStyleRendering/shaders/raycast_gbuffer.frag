@@ -1,39 +1,17 @@
 #version 420
-struct Light 
-{
-    vec3 direction;
-    vec3 ambient;
-    vec3 diffuse;
-};
-
 layout(binding=0) uniform sampler2D cubeFront;
 layout(binding=1) uniform sampler2D cubeBack;
 layout(binding=2) uniform sampler3D volume;
-layout(binding=3) uniform sampler3D gradients;
 layout(binding=4) uniform sampler1D transferFunction;
 layout(binding=5) uniform sampler2D bakedNoise;
-
-uniform mat3 ciModelMatrixInverseTranspose;
-uniform Light light;
 
 uniform ivec2 threshold;
 uniform vec3 stepSize;
 uniform int iterations;
-uniform bool diffuseShading;
 
 in vec4 position;
-out vec4 fragmentColor;
 
-// Spheremap Transform for normal encoding. Used in Cry Engine 3, presented by 
-// Martin Mittring in "A bit more Deferred", p. 13
-// http://www.crytek.com/sites/default/files/A_bit_more_deferred_-_CryEngine3.ppt
-vec3 decode (vec2 enc)
-{
-    vec3 n;
-    n.z = dot(enc, enc) * 2.0 - 1.0;
-    n.xy = normalize(enc.xy) * sqrt(1.0 - n.z * n.z);
-    return n;
-}
+layout (location=0) out vec4 albedo;
 
 void main(void)
 {
@@ -79,17 +57,6 @@ void main(void)
                 // assigned color from transfer function for this density
                 src = texture(transferFunction, value.a);
 
-                if(diffuseShading)
-                {
-                    // gradient value
-                    value.xyz = decode(texture(gradients, pos.xyz).xy);
-                    // diffuse shading + fake ambient light
-                    vec3 normal = normalize(ciModelMatrixInverseTranspose * value.xyz);
-                    vec3 lightDir = normalize(-light.direction);
-                    float lambert = max(dot(normal, lightDir), 0.0);
-                    src.rgb = light.diffuse * lambert * src.rgb + light.ambient * src.rgb;
-                }
-
                 // front to back blending
                 src.rgb *= src.a;
                 dst = (1.0 - dst.a) * src + dst;
@@ -107,10 +74,6 @@ void main(void)
             break;
     }
 
-     // apply gamma correction
-    float gamma = 2.2;
-    dst.rgb = pow(dst.rgb, vec3(1.0 / gamma));
-
-    fragmentColor = dst;
+    albedo = dst;
     gl_FragDepth = pos.z;
 }
