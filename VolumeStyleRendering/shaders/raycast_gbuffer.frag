@@ -57,30 +57,18 @@ void main(void)
 
         if(isoValue >= threshold.x && isoValue <= threshold.y)
         {
-            // check voxel solidity
-            vec3 s = -step * 0.5;
-            pos.xyz += s;
-            isoValue = int(255.0f * texture(volume, pos.xyz).x);
-            s *= isoValue >= threshold.x && isoValue <= threshold.y ? 0.5 : -0.5;
-            pos.xyz += s;
-            value.a = texture(volume, pos.xyz).x;
-            int isoValue = int(255.0f * value.a);
+            // assigned color from transfer function for this density
+            src = texture(transferFunction, value.a);
 
-            if(isoValue >= threshold.x && isoValue <= threshold.y)
-            {
-                // assigned color from transfer function for this density
-                src = texture(transferFunction, value.a);
+            // front to back blending
+            src.rgb *= src.a;
+            dst = (1.0 - dst.a) * src + dst;
 
-                // front to back blending
-                src.rgb *= src.a;
-                dst = (1.0 - dst.a) * src + dst;
-
-                // optimization: break from loop on high enough alpha value
-                if(dst.a >= 0.95) 
-                    break;
-            }
+            // optimization: break from loop on high enough alpha value
+            if(dst.a >= 0.95) 
+                break;
         }
-
+        
         pos.xyz += step;
 
         // out of bounds
@@ -90,5 +78,4 @@ void main(void)
 
     albedo = dst;
     normal = normalize(ciModelMatrixInverseTranspose * decode(texture(gradients, pos.xyz).xy));
-    gl_FragDepth = pos.z;
 }

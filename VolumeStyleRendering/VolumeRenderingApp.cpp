@@ -220,10 +220,7 @@ void VolumeRenderingApp::update()
 
 void VolumeRenderingApp::draw()
 {
-    gl::viewport(ivec2(0), getWindowSize());
-    gl::enableDepthRead();
-    gl::enableDepthWrite();
-
+    gl::clear();
     // volume raycasting
     {
         volume.setPosition(-volume.centerPoint());

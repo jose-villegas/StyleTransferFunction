@@ -215,6 +215,7 @@ void RaycastVolume::loadFromFile(const vec3& dimensions, const vec3& ratios, con
 
 void RaycastVolume::drawCubeFaces() const
 {
+    gl::enableDepth(true);
     // draw front face
     {
         gl::ScopedFramebuffer scopedFramebuffer(frontFbo);
@@ -258,6 +259,8 @@ void RaycastVolume::drawVolume(const Camera& camera, bool deferredPath)
 
         // draw positions
         drawCubeFaces();
+        gl::ScopedBlend blend(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        gl::enableDepth(false);
 
         // bind  textures
         gl::ScopedTextureBind frontTex(frontTexture, 0);
@@ -278,9 +281,6 @@ void RaycastVolume::drawVolume(const Camera& camera, bool deferredPath)
         shader->uniform("iterations", static_cast<int>(maxSize * (1.0f / stepScale) * 2.0f));
         gl::setDefaultShaderVars();
 
-        // alpha blending
-        gl::ScopedBlend blend(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
         // raycast volume
         if (!deferredPath)
         {
@@ -293,7 +293,8 @@ void RaycastVolume::drawVolume(const Camera& camera, bool deferredPath)
             shader->uniform("light.diffuse", light.diffuse);
 
             // draw cube
-            gl::drawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, static_cast<GLuint *>(nullptr));
+            gl::drawElements(gl::toGl(cubeMesh->getPrimitive()), cubeMesh->getNumIndices(),
+                             GL_UNSIGNED_INT, static_cast<GLuint *>(nullptr));
         }
         else
         {
@@ -320,10 +321,9 @@ void RaycastVolume::drawVolume(const Camera& camera, bool deferredPath)
         gl::ScopedBuffer fsQuadIndices(fsQuadIndicesBuffer);
         gl::ScopedViewport scopedViewport(ivec2(0), app::toPixels(app::getWindowSize()));
         gl::ScopedMatrices scopedMatrices;
+        gl::enableDepth(false);
 
         // no depth read or write on composition
-        gl::disableDepthRead();
-        gl::disableDepthWrite();
         gl::clear();
 
         // scale and center quad to fit whole screen

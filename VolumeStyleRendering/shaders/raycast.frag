@@ -65,39 +65,27 @@ void main(void)
 
         if(isoValue >= threshold.x && isoValue <= threshold.y)
         {
-            // check voxel solidity
-            vec3 s = -step * 0.5;
-            pos.xyz += s;
-            isoValue = int(255.0f * texture(volume, pos.xyz).x);
-            s *= isoValue >= threshold.x && isoValue <= threshold.y ? 0.5 : -0.5;
-            pos.xyz += s;
-            value.a = texture(volume, pos.xyz).x;
-            int isoValue = int(255.0f * value.a);
+            // assigned color from transfer function for this density
+            src = texture(transferFunction, value.a);
 
-            if(isoValue >= threshold.x && isoValue <= threshold.y)
+            if(diffuseShading)
             {
-                // assigned color from transfer function for this density
-                src = texture(transferFunction, value.a);
-
-                if(diffuseShading)
-                {
-                    // gradient value
-                    value.xyz = decode(texture(gradients, pos.xyz).xy);
-                    // diffuse shading + fake ambient light
-                    vec3 normal = normalize(ciModelMatrixInverseTranspose * value.xyz);
-                    vec3 lightDir = normalize(-light.direction);
-                    float lambert = max(dot(normal, lightDir), 0.0);
-                    src.rgb = light.diffuse * lambert * src.rgb + light.ambient * src.rgb;
-                }
-
-                // front to back blending
-                src.rgb *= src.a;
-                dst = (1.0 - dst.a) * src + dst;
-
-                // optimization: break from loop on high enough alpha value
-                if(dst.a >= 0.95) 
-                    break;
+                // gradient value
+                value.xyz = decode(texture(gradients, pos.xyz).xy);
+                // diffuse shading + fake ambient light
+                vec3 normal = normalize(ciModelMatrixInverseTranspose * value.xyz);
+                vec3 lightDir = normalize(-light.direction);
+                float lambert = max(dot(normal, lightDir), 0.0);
+                src.rgb = light.diffuse * lambert * src.rgb + light.ambient * src.rgb;
             }
+
+            // front to back blending
+            src.rgb *= src.a;
+            dst = (1.0 - dst.a) * src + dst;
+
+            // optimization: break from loop on high enough alpha value
+            if(dst.a >= 0.95) 
+                break;
         }
 
         pos.xyz += step;
@@ -107,10 +95,11 @@ void main(void)
             break;
     }
 
-     // apply gamma correction
+    dst.rgb *= dst.a;
+
+    // apply gamma correction
     float gamma = 2.2;
     dst.rgb = pow(dst.rgb, vec3(1.0 / gamma));
 
-    fragmentColor = dst;
-    gl_FragDepth = pos.z;
+    fragmentColor = vec4(dst.rgb, 1.0);
 }

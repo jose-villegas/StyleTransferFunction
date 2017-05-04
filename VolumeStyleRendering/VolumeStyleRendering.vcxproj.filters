@@ -70,6 +70,7 @@
     <None Include="shaders\smooth_gradients.comp" />
     <None Include="shaders\raycast_gbuffer.frag" />
     <None Include="shaders\volume_lbuffer.frag" />
+    <None Include="shaders\fs_quad.vert" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="images\noise.png">

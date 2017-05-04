@@ -154,6 +154,7 @@
     <ClInclude Include="RaycastVolume.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="shaders\fs_quad.vert" />
     <None Include="shaders\gradients.comp" />
     <None Include="shaders\histogram.comp" />
     <None Include="shaders\volume_lbuffer.frag" />
