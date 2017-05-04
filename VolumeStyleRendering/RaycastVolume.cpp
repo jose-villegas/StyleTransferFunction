@@ -278,6 +278,7 @@ void RaycastVolume::drawVolume(const Camera& camera, bool deferredPath)
         shader->uniform("threshold", transferFunction->getThreshold());
         shader->uniform("scaleFactor", scaleFactor);
         shader->uniform("stepSize", stepSize * stepScale);
+        shader->uniform("stepScale", stepScale);
         shader->uniform("iterations", static_cast<int>(maxSize * (1.0f / stepScale) * 2.0f));
         gl::setDefaultShaderVars();
 

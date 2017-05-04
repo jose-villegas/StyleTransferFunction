@@ -19,7 +19,7 @@ out vec4 fragmentColor;
 
 void main()
 {
-    vec4 color = texture(albedo, uvs);
+    vec3 color = texture(albedo, uvs).rgb;
 
     // lambertian diffuse
     if(diffuseShading)
@@ -27,14 +27,12 @@ void main()
         vec3 normal = texture(normal, uvs).xyz;
         vec3 lightDir = normalize(-light.direction);
         float lambert = max(dot(normal, lightDir), 0.0);
-        color.rgb = light.diffuse * lambert * color.rgb + light.ambient * color.rgb;
+        color = light.diffuse * lambert * color + light.ambient * color;
     }
-
-    color.rgb *= color.a;
 
     // apply gamma correction
     float gamma = 2.2;
-    color.rgb = pow(color.rgb, vec3(1.0 / gamma));
+    color = pow(color, vec3(1.0 / gamma));
 
-    fragmentColor = vec4(color.rgb, 1.0);
+    fragmentColor = vec4(color, 1.0);
 }

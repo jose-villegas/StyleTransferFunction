@@ -10,6 +10,7 @@ uniform mat3 ciModelMatrixInverseTranspose;
 uniform ivec2 threshold;
 uniform vec3 stepSize;
 uniform int iterations;
+uniform float stepScale;
 
 in vec4 position;
 
@@ -59,6 +60,9 @@ void main(void)
         {
             // assigned color from transfer function for this density
             src = texture(transferFunction, value.a);
+
+            // oppacity correction
+            src.a = 1 - pow((1 - src.a), stepScale / 0.5);
 
             // front to back blending
             src.rgb *= src.a;

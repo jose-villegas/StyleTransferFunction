@@ -20,6 +20,7 @@ uniform ivec2 threshold;
 uniform vec3 stepSize;
 uniform int iterations;
 uniform bool diffuseShading;
+uniform float stepScale;
 
 in vec4 position;
 out vec4 fragmentColor;
@@ -68,6 +69,9 @@ void main(void)
             // assigned color from transfer function for this density
             src = texture(transferFunction, value.a);
 
+            // oppacity correction
+            src.a = 1 - pow((1 - src.a), stepScale / 0.5);
+
             if(diffuseShading)
             {
                 // gradient value
@@ -94,8 +98,6 @@ void main(void)
         if (pos.x > 1.0 || pos.y > 1.0 || pos.z > 1.0) 
             break;
     }
-
-    dst.rgb *= dst.a;
 
     // apply gamma correction
     float gamma = 2.2;
