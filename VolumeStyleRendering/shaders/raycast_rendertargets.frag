@@ -1,4 +1,11 @@
 #version 420
+struct Light 
+{
+    vec3 direction;
+    vec3 ambient;
+    vec3 diffuse;
+};
+
 layout(binding=0) uniform sampler2D cubeFront;
 layout(binding=1) uniform sampler2D cubeBack;
 layout(binding=2) uniform sampler3D volume;
@@ -7,15 +14,18 @@ layout(binding=4) uniform sampler1D transferFunction;
 layout(binding=5) uniform sampler2D bakedNoise;
 
 uniform mat3 ciModelMatrixInverseTranspose;
+uniform Light light;
+
 uniform ivec2 threshold;
 uniform vec3 stepSize;
 uniform int iterations;
+uniform bool diffuseShading;
 uniform float stepScale;
 
 in vec4 position;
 
-layout (location=0) out vec4 albedo;
-layout (location=1) out vec3 normal;
+layout (location=0) out vec4 oColor;
+layout (location=1) out vec3 oNormal;
 
 // Spheremap Transform for normal encoding. Used in Cry Engine 3, presented by 
 // Martin Mittring in "A bit more Deferred", p. 13
@@ -64,6 +74,17 @@ void main(void)
             // oppacity correction
             src.a = 1 - pow((1 - src.a), stepScale / 0.5);
 
+            if(diffuseShading)
+            {
+                // gradient value
+                value.xyz = decode(texture(gradients, pos.xyz).xy);
+                // diffuse shading + fake ambient light
+                vec3 normal = normalize(ciModelMatrixInverseTranspose * value.xyz);
+                vec3 lightDir = normalize(-light.direction);
+                float lambert = max(dot(normal, lightDir), 0.0);
+                src.rgb = light.diffuse * lambert * src.rgb + light.ambient * src.rgb;
+            }
+
             // front to back blending
             src.rgb *= src.a;
             dst = (1.0 - dst.a) * src + dst;
@@ -72,7 +93,7 @@ void main(void)
             if(dst.a >= 0.95) 
                 break;
         }
-        
+
         pos.xyz += step;
 
         // out of bounds
@@ -80,6 +101,7 @@ void main(void)
             break;
     }
 
-    albedo = dst;
-    normal = normalize(ciModelMatrixInverseTranspose * decode(texture(gradients, pos.xyz).xy));
+    oColor = vec4(dst.rgb, 1.0);
+    oNormal = value.xyz;
+    gl_FragDepth = pos.z;
 }

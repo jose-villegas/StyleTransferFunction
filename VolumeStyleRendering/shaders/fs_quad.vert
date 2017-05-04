@@ -1,15 +1,15 @@
 #version 420
 uniform mat4 ciModelViewProjection;
 
-layout(location = 0) in vec4 position;
-layout(location = 1) in vec2 texCoord;
+in vec4 ciPosition;
+in vec2 ciTexCoord0;
 
 out vec2 uvs;
 
 void main()
 {
     // fs quad uv coords
-    uvs = texCoord;
+    uvs = ciTexCoord0;
     // final drawing pos
-    gl_Position = ciModelViewProjection * position;
+    gl_Position = ciModelViewProjection * ciPosition;
 }

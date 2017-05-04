@@ -8,10 +8,11 @@ class RaycastVolume
 {
 public:
     void loadFromFile(const glm::vec3& dimensions, const glm::vec3& ratios, const std::string filepath, bool is16Bits = false);
-    void drawVolume(const cinder::Camera &camera, bool deferredPath = false);
+    void drawVolume(const cinder::Camera& camera, bool toRendertargets);
     void resizeFbos();
     explicit RaycastVolume();
     ~RaycastVolume();
+
     // getters and setters
     glm::vec3 centerPoint() const;
     const float &getStepScale() const;
@@ -27,6 +28,11 @@ public:
     void setRotation(const glm::quat& rotation);
     const glm::vec3 &getPosition() const;
     void setPosition(const glm::vec3& position);
+
+    // render targets
+    const ci::gl::Texture2dRef &getColorTexture() const;
+    const cinder::gl::Texture2dRef &getNormalTexture() const;
+    const cinder::gl::Texture2dRef &getDepthTexture() const;
 private:
     // histogram data
     std::array<float, 256> histogram;
@@ -37,13 +43,6 @@ private:
     ci::gl::VboRef cubeIndicesBuffer;
     ci::gl::VaoRef cubeVao;
 
-    // full screen quad
-    ci::TriMeshRef fsQuadMesh;
-    ci::gl::VboRef fsQuadVerticesBuffer;
-    ci::gl::VboRef fsQuadTexcoordBuffer;
-    ci::gl::VboRef fsQuadIndicesBuffer;
-    ci::gl::VaoRef fsQuadVao;
-
     // volume texture
     ci::gl::Texture3dRef gradientTexture;
     ci::gl::Texture3dRef volumeTexture;
@@ -51,34 +50,33 @@ private:
     // fbos
     ci::gl::FboRef frontFbo;
     ci::gl::FboRef backFbo;
-    ci::gl::FboRef gBuffer;
+    ci::gl::FboRef volumeRBuffer;
 
     // draw positions shader
-    cinder::gl::GlslProgRef positionsShader;
+    ci::gl::GlslProgRef positionsShader;
 
     // volume raycast
-    cinder::gl::GlslProgRef raycastShader;
-    cinder::gl::GlslProgRef raycastShaderGBuffer;
+    cinder::gl::GlslProgRef raycastShaderRendertargets;
+    cinder::gl::GlslProgRef raycastShaderDirect;
     std::shared_ptr<TransferFunction> transferFunction;
 
     // lighting
-    cinder::gl::GlslProgRef volumeLBuffer;
     Light light;
 
     // compute shaders
-    cinder::gl::SsboRef histogramSsbo;
-    cinder::gl::GlslProgRef histogramCompute;
-    cinder::gl::GlslProgRef gradientsCompute;
-    cinder::gl::GlslProgRef smoothGradientsCompute;
+    ci::gl::SsboRef histogramSsbo;
+    ci::gl::GlslProgRef histogramCompute;
+    ci::gl::GlslProgRef gradientsCompute;
+    ci::gl::GlslProgRef smoothGradientsCompute;
 
     // render targets
-    cinder::gl::Texture2dRef frontTexture;
-    cinder::gl::Texture2dRef backTexture;
-    cinder::gl::Texture2dRef volumeNormal;
-    cinder::gl::Texture2dRef volumeAlbedo;
+    ci::gl::Texture2dRef frontTexture;
+    ci::gl::Texture2dRef backTexture;
+    ci::gl::Texture2dRef volumeNormal;
+    ci::gl::Texture2dRef volumeColor;
 
     // raycast parameters
-    cinder::gl::Texture2dRef noiseTexture;
+    ci::gl::Texture2dRef noiseTexture;
     glm::vec3 dimensions;
     glm::vec3 stepSize;
     glm::vec3 aspectRatios;
@@ -94,7 +92,6 @@ private:
 
     void drawCubeFaces() const;
     void createCubeVbo();
-    void createFullscreenQuad();
     void readVolumeFromFile8(const std::string filepath);
     void readVolumeFromFile16(const std::string filepath);
 

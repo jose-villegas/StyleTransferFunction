@@ -21,9 +21,12 @@ uniform vec3 stepSize;
 uniform int iterations;
 uniform bool diffuseShading;
 uniform float stepScale;
+uniform float gamma;
+uniform float exposure;
 
 in vec4 position;
-out vec4 fragmentColor;
+
+layout (location=0) out vec4 oColor;
 
 // Spheremap Transform for normal encoding. Used in Cry Engine 3, presented by 
 // Martin Mittring in "A bit more Deferred", p. 13
@@ -99,9 +102,10 @@ void main(void)
             break;
     }
 
-    // apply gamma correction
-    float gamma = 2.2;
-    dst.rgb = pow(dst.rgb, vec3(1.0 / gamma));
+    // Exposure tone mapping
+    vec3 mapped =  vec3(1.0) - exp(-dst.rgb * exposure);
+    // Gamma correction 
+    mapped = pow(mapped, vec3(1.0 / gamma));
 
-    fragmentColor = vec4(dst.rgb, 1.0);
+    oColor = vec4(mapped, 1.0);
 }
