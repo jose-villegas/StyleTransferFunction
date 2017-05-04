@@ -8,7 +8,7 @@ class RaycastVolume
 {
 public:
     void loadFromFile(const glm::vec3& dimensions, const glm::vec3& ratios, const std::string filepath, bool is16Bits = false);
-    void drawVolume(bool deferredPath = false);
+    void drawVolume(const cinder::Camera &camera, bool deferredPath = false);
     void resizeFbos();
     explicit RaycastVolume();
     ~RaycastVolume();
@@ -62,7 +62,7 @@ private:
     std::shared_ptr<TransferFunction> transferFunction;
 
     // lighting
-    cinder::gl::GlslProgRef lightBuffer;
+    cinder::gl::GlslProgRef volumeLBuffer;
     Light light;
 
     // compute shaders
@@ -71,9 +71,13 @@ private:
     cinder::gl::GlslProgRef gradientsCompute;
     cinder::gl::GlslProgRef smoothGradientsCompute;
 
-    // raycast parameters
+    // render targets
     cinder::gl::Texture2dRef frontTexture;
     cinder::gl::Texture2dRef backTexture;
+    cinder::gl::Texture2dRef volumeNormal;
+    cinder::gl::Texture2dRef volumeAlbedo;
+
+    // raycast parameters
     cinder::gl::Texture2dRef noiseTexture;
     glm::vec3 dimensions;
     glm::vec3 stepSize;
@@ -88,7 +92,7 @@ private:
     glm::quat modelRotation;
     glm::vec3 modelPosition;
 
-    void drawCubeFaces();
+    void drawCubeFaces() const;
     void createCubeVbo();
     void createFullscreenQuad();
     void readVolumeFromFile8(const std::string filepath);

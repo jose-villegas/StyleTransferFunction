@@ -69,7 +69,7 @@
     <None Include="shaders\gradients.comp" />
     <None Include="shaders\smooth_gradients.comp" />
     <None Include="shaders\raycast_gbuffer.frag" />
-    <None Include="shaders\light_buffer.frag" />
+    <None Include="shaders\volume_lbuffer.frag" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="images\noise.png">

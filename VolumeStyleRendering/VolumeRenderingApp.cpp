@@ -102,6 +102,8 @@ void VolumeRenderingApp::renderingOptionsUi(bool& showRendering)
             volume.setAspectratios(aspectRatios);
         }
 
+        ui::Separator();
+        ui::Text("Rendering Path");
         ui::RadioButton("Forward Rendering", &renderingPath, 0);
         ui::RadioButton("Deferred Rendering", &renderingPath, 1);
 
@@ -221,12 +223,11 @@ void VolumeRenderingApp::draw()
     gl::viewport(ivec2(0), getWindowSize());
     gl::enableDepthRead();
     gl::enableDepthWrite();
-    gl::setMatrices(camera);
 
     // volume raycasting
     {
         volume.setPosition(-volume.centerPoint());
-        volume.drawVolume(useDeferredPath);
+        volume.drawVolume(camera, useDeferredPath);
     }
 }
 

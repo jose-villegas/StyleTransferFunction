@@ -48,9 +48,9 @@ RaycastVolume::RaycastVolume() : aspectRatios(1), scaleFactor(vec3(1)), stepScal
         .vertex(loadFile("shaders/raycast.vert"))
         .fragment(loadFile("shaders/raycast_gbuffer.frag")));
     // deferred light pass
-    lightBuffer = gl::GlslProg::create(gl::GlslProg::Format()
+    volumeLBuffer = gl::GlslProg::create(gl::GlslProg::Format()
         .vertex(loadFile("shaders/fs_quad.vert"))
-        .fragment(loadFile("shaders/light_buffer.frag")));
+        .fragment(loadFile("shaders/volume_lbuffer.frag")));
     // histogram calculation 
     histogramCompute = gl::GlslProg::create(gl::GlslProg::Format()
         .compute(loadFile("shaders/histogram.comp")));
@@ -213,7 +213,7 @@ void RaycastVolume::loadFromFile(const vec3& dimensions, const vec3& ratios, con
     generateGradients();
 }
 
-void RaycastVolume::drawCubeFaces()
+void RaycastVolume::drawCubeFaces() const
 {
     // draw front face
     {
@@ -241,7 +241,7 @@ void RaycastVolume::drawCubeFaces()
     }
 }
 
-void RaycastVolume::drawVolume(bool deferredPath)
+void RaycastVolume::drawVolume(const Camera& camera, bool deferredPath)
 {
     if (!isDrawable) return;
 
@@ -252,6 +252,7 @@ void RaycastVolume::drawVolume(bool deferredPath)
         gl::ScopedBuffer scopedCubeIndicesBuffer(cubeIndicesBuffer);
 
         // set model matrix for model
+        gl::setMatrices(camera);
         gl::rotate(modelRotation);
         gl::translate(modelPosition);
 
@@ -262,19 +263,20 @@ void RaycastVolume::drawVolume(bool deferredPath)
         gl::ScopedTextureBind frontTex(frontTexture, 0);
         gl::ScopedTextureBind backTex(backTexture, 1);
         gl::ScopedTextureBind volumeTex(volumeTexture, 2);
+        gl::ScopedTextureBind gradientTex(gradientTexture, 3);
         gl::ScopedTextureBind trasferTex(transferFunction->get1DTexture(), 4);
         gl::ScopedTextureBind noiseTex(noiseTexture, 5);
 
         // shader program to use
         auto shader = deferredPath ? raycastShaderGBuffer : raycastShader;
         gl::ScopedGlslProg scopedProg(shader);
-        gl::setDefaultShaderVars();
 
         // raycast parameters
         shader->uniform("threshold", transferFunction->getThreshold());
         shader->uniform("scaleFactor", scaleFactor);
         shader->uniform("stepSize", stepSize * stepScale);
         shader->uniform("iterations", static_cast<int>(maxSize * (1.0f / stepScale) * 2.0f));
+        gl::setDefaultShaderVars();
 
         // alpha blending
         gl::ScopedBlend blend(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -283,8 +285,7 @@ void RaycastVolume::drawVolume(bool deferredPath)
         if (!deferredPath)
         {
             gl::clear();
-            // specific texture for forward
-            gl::ScopedTextureBind gradientTex(gradientTexture, 3);
+
             // lighting
             shader->uniform("diffuseShading", enableDiffuseShading);
             shader->uniform("light.direction", light.direction);
@@ -297,6 +298,12 @@ void RaycastVolume::drawVolume(bool deferredPath)
         else
         {
             const gl::ScopedFramebuffer scopedFramebuffer(gBuffer);
+            {
+                const static GLenum buffers[] = {
+                    GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1,
+                };
+                gl::drawBuffers(2, buffers);
+            }
             const gl::ScopedViewport scopedViewport(ivec2(0), gBuffer->getSize());
             gl::clear();
 
@@ -308,7 +315,7 @@ void RaycastVolume::drawVolume(bool deferredPath)
     // light pass
     if (deferredPath)
     {
-        gl::ScopedGlslProg scopedLightProg(lightBuffer);
+        gl::ScopedGlslProg scopedLightProg(volumeLBuffer);
         gl::ScopedVao scopedFsQuadVao(fsQuadVao);
         gl::ScopedBuffer fsQuadIndices(fsQuadIndicesBuffer);
         gl::ScopedViewport scopedViewport(ivec2(0), app::toPixels(app::getWindowSize()));
@@ -322,6 +329,16 @@ void RaycastVolume::drawVolume(bool deferredPath)
         // scale and center quad to fit whole screen
         gl::translate(app::getWindowCenter());
         gl::scale(app::getWindowSize());
+
+        // textures
+        volumeAlbedo->bind(0);
+        volumeNormal->bind(1);
+
+        // pass uniforms
+        volumeLBuffer->uniform("diffuseShading", enableDiffuseShading);
+        volumeLBuffer->uniform("light.direction", light.direction);
+        volumeLBuffer->uniform("light.ambient", light.ambient);
+        volumeLBuffer->uniform("light.diffuse", light.diffuse);
         gl::setDefaultShaderVars();
 
         // draw fs quad
@@ -343,6 +360,12 @@ void RaycastVolume::resizeFbos()
                                                                .minFilter(GL_NEAREST)
                                                                .wrap(GL_CLAMP_TO_EDGE);
 
+    gl::Texture2d::Format tightNormals = gl::Texture2d::Format().internalFormat(GL_RGB16F)
+                                                                .magFilter(GL_NEAREST)
+                                                                .minFilter(GL_NEAREST)
+                                                                .wrap(GL_REPEAT)
+                                                                .dataType(GL_FLOAT);
+
     const ivec2 winSize = app::getWindowSize();
     const int32_t h = winSize.y;
     const int32_t w = winSize.x;
@@ -353,6 +376,8 @@ void RaycastVolume::resizeFbos()
         gl::Fbo::Format frontFormat, backFormat;
         frontTexture = gl::Texture2d::create(w, h, dataFormat);
         backTexture = gl::Texture2d::create(w, h, dataFormat);
+        volumeAlbedo = gl::Texture2d::create(w, h, colorFormat);
+        volumeNormal = gl::Texture2d::create(w, h, tightNormals);
 
         // front fbo
         frontFormat.attachment(GL_COLOR_ATTACHMENT0, frontTexture);
@@ -366,7 +391,8 @@ void RaycastVolume::resizeFbos()
 
         // deferred rendering mode gbuffer
         gl::Fbo::Format gBufferFormat;
-        gBufferFormat.colorTexture(colorFormat);
+        gBufferFormat.attachment(GL_COLOR_ATTACHMENT0, volumeAlbedo);
+        gBufferFormat.attachment(GL_COLOR_ATTACHMENT1, volumeNormal);
         gBufferFormat.depthTexture();
         gBuffer = gl::Fbo::create(w, h, gBufferFormat);
     }
