@@ -39,6 +39,16 @@ vec3 decode (vec2 enc)
     return n;
 }
 
+vec3 ACESFilm( vec3 x )
+{
+    float a = 2.51;
+    float b = 0.03;
+    float c = 2.43;
+    float d = 0.59;
+    float e = 0.14;
+    return clamp((x*(a*x+b))/(x*(c*x+d)+e), 0.0, 1.0);
+}
+
 void main(void)
 {
     vec2 texC = position.xy / position.w;
@@ -103,7 +113,7 @@ void main(void)
     }
 
     // Exposure tone mapping
-    vec3 mapped =  vec3(1.0) - exp(-dst.rgb * exposure);
+    vec3 mapped = ACESFilm(dst.rgb * exposure);
     // Gamma correction 
     mapped = pow(mapped, vec3(1.0 / gamma));
 

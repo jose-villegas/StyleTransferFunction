@@ -136,12 +136,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="CubicSpline.cpp" />
     <ClCompile Include="external\Cinder-ImGui\lib\imgui\imgui.cpp" />
     <ClCompile Include="external\Cinder-ImGui\lib\imgui\imgui_demo.cpp" />
     <ClCompile Include="external\Cinder-ImGui\lib\imgui\imgui_draw.cpp" />
     <ClCompile Include="external\Cinder-ImGui\src\CinderImGui.cpp" />
     <ClCompile Include="Postprocess.cpp" />
     <ClCompile Include="RenderingParams.cpp" />
+    <ClCompile Include="StyleTransferFunction.cpp" />
     <ClCompile Include="VolumeRenderingAppUi.cpp" />
     <ClCompile Include="TransferFunction.cpp" />
     <ClCompile Include="TransferFunctionPoint.cpp" />
@@ -150,9 +152,11 @@
     <ClCompile Include="VolumeRenderingApp.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CubicSpline.h" />
     <ClInclude Include="Light.h" />
     <ClInclude Include="Postprocess.h" />
     <ClInclude Include="RenderingParams.h" />
+    <ClInclude Include="StyleTransferFunction.h" />
     <ClInclude Include="VolumeRenderingAppUi.h" />
     <ClInclude Include="TransferFunction.h" />
     <ClInclude Include="TransferFunctionPoint.h" />
@@ -161,8 +165,10 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\fs_quad.vert" />
+    <None Include="shaders\fxaa.frag" />
     <None Include="shaders\gradients.comp" />
     <None Include="shaders\histogram.comp" />
+    <None Include="shaders\raycast_rendertargets.frag" />
     <None Include="shaders\tonemapping.frag" />
     <None Include="shaders\positions.frag" />
     <None Include="shaders\positions.vert" />

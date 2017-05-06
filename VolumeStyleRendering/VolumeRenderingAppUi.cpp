@@ -45,7 +45,7 @@ void VolumeRenderingAppUi::DrawUi(RaycastVolume& volume)
     if(!transferFunctionUi)
     {
         transferFunctionUi = std::make_shared<TransferFunctionUi>();
-        volume.setTransferFunction(transferFunctionUi);
+        volume.setTransferFunction(transferFunctionUi->getTranferFunction());
     }
     else
     {
@@ -107,6 +107,7 @@ void VolumeRenderingAppUi::DrawLightingSetup(RaycastVolume& volume)
     if (showLightingSetup)
     {
         static Light light = volume.getLight();
+        static float lightIntensity = 1.0f;
         static vec3 rotation;
         static bool doShading = true;
         bool changed = false;
@@ -120,12 +121,13 @@ void VolumeRenderingAppUi::DrawLightingSetup(RaycastVolume& volume)
         changed |= ui::SliderFloat3("Rotation", value_ptr(rotation), -180, 180);
         changed |= ui::DragFloat3("Ambient", value_ptr(light.ambient), 0.01, 0, 1);
         changed |= ui::DragFloat3("Diffuse", value_ptr(light.diffuse), 0.01, 0, 1);
+        changed |= ui::DragFloat("Intensity", &lightIntensity, 0.1, 0, 32);
 
         if (changed)
         {
             vec3 rads = radians(rotation);
             light.direction = vec3(0, 0, 1) * mat3(eulerAngleXYZ(rads.x, rads.y, rads.z));
-            volume.setLight(light.direction, light.ambient, light.diffuse);
+            volume.setLight(light.direction, light.ambient, light.diffuse * lightIntensity);
         }
 
         ui::End();

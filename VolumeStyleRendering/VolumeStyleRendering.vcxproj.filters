@@ -51,6 +51,12 @@
     <ClCompile Include="RenderingParams.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="StyleTransferFunction.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CubicSpline.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TransferFunctionPoint.h">
@@ -77,6 +83,12 @@
     <ClInclude Include="RenderingParams.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="StyleTransferFunction.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CubicSpline.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\positions.vert" />
@@ -88,6 +100,8 @@
     <None Include="shaders\smooth_gradients.comp" />
     <None Include="shaders\fs_quad.vert" />
     <None Include="shaders\tonemapping.frag" />
+    <None Include="shaders\raycast_rendertargets.frag" />
+    <None Include="shaders\fxaa.frag" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="images\noise.png">

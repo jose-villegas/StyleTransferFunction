@@ -66,7 +66,7 @@ void VolumeRenderingApp::draw()
         // anti aliasing
         if(RenderingParams::FXAAEnabled())
         {
-            postProcess.fxAA();
+            postProcess.FXAA();
         }
         else
         {

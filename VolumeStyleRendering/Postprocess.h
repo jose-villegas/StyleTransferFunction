@@ -25,7 +25,7 @@ public:
      * \brief Fast approximate anti-aliasing post effect
      * \param texture The color buffer texture
      */
-    void fxAA(const cinder::gl::Texture2dRef &texture = nullptr) const;
+    void FXAA(const cinder::gl::Texture2dRef &texture = nullptr) const;
     /**
      * \brief Resizes the created framebuffers to the actual window's size
      */

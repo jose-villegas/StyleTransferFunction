@@ -1,7 +1,7 @@
 #include "RaycastVolume.h"
 #include <cinder/app/AppBase.h>
 #include <cinder/Log.h>
-#include "TransferFunction.h"
+#include "TransferFunctionUi.h"
 #include "RenderingParams.h"
 using namespace ci;
 using namespace glm;
@@ -230,14 +230,15 @@ void RaycastVolume::drawVolume(const Camera& camera, bool toRendertargets)
         auto program = toRendertargets ? raycastShaderRendertargets : raycastShaderDirect;
         gl::ScopedGlslProg scopedProg(program);
         gl::ScopedBlend blend(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        gl::enableDepth(true);
+        gl::ScopedDepthTest depthRead(false);
+        gl::ScopedDepthWrite depthWrite(true);
 
         // bind  textures
         gl::ScopedTextureBind frontTex(frontTexture, 0);
         gl::ScopedTextureBind backTex(backTexture, 1);
         gl::ScopedTextureBind volumeTex(volumeTexture, 2);
         gl::ScopedTextureBind gradientTex(gradientTexture, 3);
-        gl::ScopedTextureBind trasferTex(transferFunction->get1DTexture(), 4);
+        gl::ScopedTextureBind trasferTex(transferFunction->getColorMappingTexture(), 4);
         gl::ScopedTextureBind noiseTex(noiseTexture, 5);
 
         // raycast parameters

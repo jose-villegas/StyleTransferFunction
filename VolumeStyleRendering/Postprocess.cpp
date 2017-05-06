@@ -11,10 +11,7 @@ void PostProcess::displayTexture(const gl::Texture2dRef colorTex) const
     const gl::ScopedViewport scopedViewport(ivec2(0), toPixels(getWindowSize()));
     const gl::ScopedMatrices scopedMatrices;
     const gl::ScopedTextureBind scopedTextureBind(colorTex ? colorTex : temporalTexture, 0);
-
-    // no depth write or read for quad display
-    gl::disableDepthRead();
-    gl::disableDepthWrite();
+    const gl::ScopedDepth depth(false);
     gl::clear();
 
     // translate to center and scale to fit whole screen
@@ -31,16 +28,13 @@ void PostProcess::toneMapping(const gl::Texture2dRef& hdrBuffer) const
     const gl::ScopedViewport scopedViewport(ivec2(0), temporalFbo->getSize());
     const gl::ScopedMatrices scopedMatrices;
     const gl::ScopedTextureBind scopedTextureBind(hdrBuffer, 0);
+    const gl::ScopedDepth depth(false);
+    gl::clear();
 
     // custom uniforms
     auto& prog = toneMappingRect->getGlslProg();
     prog->uniform("gamma", RenderingParams::GetGamma());
     prog->uniform("exposure", RenderingParams::GetExposure());
-
-    // no depth write or read for quad display
-    gl::disableDepthRead();
-    gl::disableDepthWrite();
-    gl::clear();
 
     // translate to center and scale to fit whole screen
     gl::translate(getWindowCenter());
@@ -50,20 +44,17 @@ void PostProcess::toneMapping(const gl::Texture2dRef& hdrBuffer) const
     toneMappingRect->draw();
 }
 
-void PostProcess::fxAA(const gl::Texture2dRef& texture) const
+void PostProcess::FXAA(const gl::Texture2dRef& texture) const
 {
     const gl::ScopedViewport scopedViewport(ivec2(0), toPixels(getWindowSize()));
     const gl::ScopedMatrices scopedMatrices;
     const gl::ScopedTextureBind scopedTextureBind(texture ? texture : temporalTexture, 0);
+    const gl::ScopedDepth depth(false);
+    gl::clear();
 
     // custom uniforms
     auto& prog = fxaaRect->getGlslProg();
     prog->uniform("pixelSize", vec2(1.0f) / vec2(toPixels(getWindowSize())));
-
-    // no depth write or read for quad display
-    gl::disableDepthRead();
-    gl::disableDepthWrite();
-    gl::clear();
 
     // translate to center and scale to fit whole screen
     gl::translate(getWindowCenter());
