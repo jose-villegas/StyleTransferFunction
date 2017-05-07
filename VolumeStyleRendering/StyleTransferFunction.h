@@ -21,10 +21,11 @@ class StylePoint : public TransferFunctionPoint
 public:
     StylePoint();
     StylePoint(int isoValue, unsigned styleIndex);
-    int getStyle() const;
+    int getStyleIndex() const;
+    const Style &getStyle() const;
     void setStyle(unsigned index);
 private:
-    unsigned styleIndex;
+    int styleIndex;
 };
 
 class StyleTransferFunction : public TransferFunction
@@ -34,12 +35,13 @@ public:
     ~StyleTransferFunction();
 
     void addStylePoint(const StylePoint& style);
-    void removeStylePoint(const int isoValue);
+    void removeStylePoint(const int index);
+    void setStylePoint(const int index, const int styleIndex);
     void updateFunction() override;
+    const std::vector<StylePoint> &getStylePoints() const;
+    void setStylePointIsoValue(const int index, const int isoValue);;
 private:
     std::vector<StylePoint> stylePoints;
-    std::vector<TransferFunctionAlphaPoint> alphaPoints;
-    std::vector<CubicSpline> alphaSpline;
 
     ci::gl::Texture1dRef transferFunctionTexture;
     ci::gl::Texture1dRef indexFunctionTexture;

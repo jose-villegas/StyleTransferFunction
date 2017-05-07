@@ -5,7 +5,7 @@
 using namespace glm;
 using namespace ci;
 
-void TransferFunctionUi::drawThresholdControl()
+void TransferFunctionUi::drawThresholdControl() const
 {
     // draw threshold indicator
     const ImVec2 p = ui::GetCursorScreenPos();
@@ -116,8 +116,9 @@ int TransferFunctionUi::stylesManagerPopup() const
             ui::BeginGroup();
 
             if (ui::InputText("Name", &style.name)) { Style::RenameStyle(i, style.name); }
+            int inputHeight = ui::GetItemRectSize().y;
 
-            if (ui::Button("Select", ImVec2(ui::GetContentRegionAvailWidth() - 4, 0)))
+            if (ui::Button("Select", ImVec2(ui::GetContentRegionAvailWidth() - 4, 64 - inputHeight)))
             {
                 ui::CloseCurrentPopup();
                 selectedStyle = i;
@@ -174,6 +175,7 @@ void TransferFunctionUi::drawControlPointsUi() const
     float step = static_cast<float>(width) / 256;
     auto& colorPoints = transferFunction->getColorPoints();
     auto& alphaPoints = transferFunction->getAlphaPoints();
+    auto& stylePoints = transferFunction->getStylePoints();
 
     for (int i = 0; i < 256; i++)
     {
@@ -191,6 +193,13 @@ void TransferFunctionUi::drawControlPointsUi() const
         ImU32 invCol32 = ImColor(1.0f - color.r, 1.0f - color.g, 1.0f - color.b, 1.0f);
         drawList->AddCircleFilled(ImVec2(p.x + step * colorP.getIsoValue() + 4.0f, y + sz), 5, col32, 24);
         drawList->AddCircle(ImVec2(p.x + step * colorP.getIsoValue() + 4.0f, y + sz), 5, invCol32, 24);
+    }
+
+    for (auto& styleP : stylePoints)
+    {
+        const auto img = (void*)(intptr_t)styleP.getStyle().litsphere->getId();
+        drawList->AddImage(img, ImVec2(p.x + step * styleP.getIsoValue() + 4.0f - 8, y - 8),
+                           ImVec2(p.x + step * styleP.getIsoValue() + 4.0f + 16 - 8, y + 16 - 8));
     }
 
     for (int i = 0; i < 255; i++)
@@ -214,107 +223,174 @@ void TransferFunctionUi::drawControlPointsUi() const
     ui::Dummy(ImVec2(width, sz + 15.0f));
 }
 
-void TransferFunctionUi::drawControlPointList(int pointType)
+void TransferFunctionUi::drawPointIsoValueControl(const TransferFunctionPoint& p, const int index, int pointType) const
 {
-    bool deleteCtrlPoint = false;
+    int pIso = p.getIsoValue();
+    ui::SameLine();
+    ui::PushItemWidth(-30);
 
-    auto isoValueControl = [&](const TransferFunctionPoint& p, const int index)
+    if (p.getIsoValue() != 0 && p.getIsoValue() != 255)
+    {
+        if (ui::SliderInt("##isoValA", &pIso, 1, 254))
+        {
+            pIso = min(max(pIso, 1), 254);
+            pointType == 0 ? transferFunction->setAlphaPointIsoValue(index, pIso)
+                : pointType == 1 ? transferFunction->setColorPointIsoValue(index, pIso)
+                : transferFunction->setStylePointIsoValue(index, pIso);
+        }
+    }
+    else if (p.getIsoValue() == 0 || p.getIsoValue() == 255)
+    {
+        ui::PushStyleColor(ImGuiCol_Button, ImVec4(vec4(0.5f)));
+        ui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(vec4(0.5f)));
+        ui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(vec4(0.5f)));
+        ui::Button(std::to_string(p.getIsoValue()).c_str(),
+                   ImVec2(ui::GetContentRegionAvailWidth() - 30, 0));
+        ui::PopStyleColor(3);
+    }
+
+    ui::PopItemWidth();
+}
+
+void TransferFunctionUi::drawAlphaPointList() const
+{
+    for (auto i = 0; i < transferFunction->getAlphaPoints().size(); i++)
+    {
+        auto& alphaP = transferFunction->getAlphaPoints()[i];
+        auto pAlpha = alphaP.getAlpha();
+
+        ui::PushID(&alphaP);
+        ui::PushItemWidth(ui::GetContentRegionAvailWidth() * 0.5f);
+
+        if (ui::DragFloat("##alpha", &pAlpha, 0.01f, 0.0f, 1.0f))
+        {
+            transferFunction->setAlpha(i, pAlpha);
+        }
+
+        ui::PopItemWidth();
+        drawPointIsoValueControl(alphaP, i, 0);
+
+        if (alphaP.getIsoValue() != 0 && alphaP.getIsoValue() != 255)
+        {
+            ui::SameLine();
+
+            if (ui::Button("X", ImVec2(ui::GetContentRegionAvailWidth(), 0)))
             {
-                int pIso = p.getIsoValue();
-                ui::SameLine();
-                ui::PushItemWidth(-30);
+                transferFunction->removeAlphaPoint(i--);
+            }
+        }
 
-                if (p.getIsoValue() != 0 && p.getIsoValue() != 255)
-                {
-                    if (ui::SliderInt("##isoValA", &pIso, 1, 254))
-                    {
-                        pIso = min(max(pIso, 1), 254);
-                        pointType == 0 ? transferFunction->setAlphaPointIsoValue(index, pIso)
-                            : transferFunction->setColorPointIsoValue(index, pIso);
-                    }
-                }
-                else if (p.getIsoValue() == 0 || p.getIsoValue() == 255)
-                {
-                    ui::PushStyleColor(ImGuiCol_Button, ImVec4(vec4(0.5f)));
-                    ui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(vec4(0.5f)));
-                    ui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(vec4(0.5f)));
-                    ui::Button(std::to_string(p.getIsoValue()).c_str(),
-                               ImVec2(ui::GetContentRegionAvailWidth() - 30, 0));
-                    ui::PopStyleColor(3);
-                }
+        ui::PopID();
+    }
+}
 
-                ui::PopItemWidth();
+void TransferFunctionUi::drawColorPointList() const
+{
+    for (auto i = 0; i < transferFunction->getColorPoints().size(); i++)
+    {
+        auto& colorP = transferFunction->getColorPoints()[i];
+        auto pColor = colorP.getColor();
 
-                if (p.getIsoValue() != 0 && p.getIsoValue() != 255)
-                {
-                    ui::SameLine();
+        ui::PushID(&colorP);
+        ui::PushItemWidth(ui::GetContentRegionAvailWidth() * 0.5f);
 
-                    if (ui::Button("X", ImVec2(ui::GetContentRegionAvailWidth(), 0)))
-                    {
-                        deleteCtrlPoint = true;
-                    }
-                }
-            };
+        if (ui::ColorEdit3("##color", value_ptr(pColor)))
+        {
+            transferFunction->setColor(i, pColor);
+        }
 
+        ui::PopItemWidth();
+        drawPointIsoValueControl(colorP, i, 1);
+
+        if (colorP.getIsoValue() != 0 && colorP.getIsoValue() != 255)
+        {
+            ui::SameLine();
+
+            if (ui::Button("X", ImVec2(ui::GetContentRegionAvailWidth(), 0)))
+            {
+                transferFunction->removeColorPoint(i--);
+            }
+        }
+
+        ui::PopID();
+    }
+}
+
+void TransferFunctionUi::drawStylePointList() const
+{
+    static bool showStyleManager = false;
+    static int stylePointChangeIndex = -1;
+    static int height = 1;
+
+    for (auto i = 0; i < transferFunction->getStylePoints().size(); i++)
+    {
+        auto& styleP = transferFunction->getStylePoints()[i];
+        // copy style struct
+        auto style = styleP.getStyle();
+
+        ui::PushID(&styleP);
+        ui::Image((void *)(intptr_t)style.litsphere->getId(), ImVec2(height, height));
+        ui::SameLine();
+        ui::PushItemWidth(ui::GetContentRegionAvailWidth() * 0.4f - 32);
+
+        if (ui::InputText("##name", &style.name)) { Style::RenameStyle(styleP.getStyleIndex(), style.name); }
+
+        ui::PopItemWidth();
+        ui::SameLine();
+
+        if (ui::Button("Change Style"))
+        {
+            showStyleManager = true;
+            stylePointChangeIndex = i;
+        }
+
+        height = ui::GetItemRectSize().y;
+        drawPointIsoValueControl(styleP, i, 2);
+        ui::SameLine();
+
+        if (ui::Button("X", ImVec2(ui::GetContentRegionAvailWidth(), 0)))
+        {
+            transferFunction->removeStylePoint(i--);
+        }
+
+        ui::PopID();
+    }
+
+    if (showStyleManager && stylePointChangeIndex >= 0)
+    {
+        ui::OpenPopup("Styles Manager");
+        auto styleIndex = stylesManagerPopup();
+        showStyleManager = styleIndex == -2;
+
+        if (styleIndex >= 0)
+        {
+            transferFunction->setStylePoint(stylePointChangeIndex, styleIndex);
+            stylePointChangeIndex = -1;
+        }
+    }
+}
+
+void TransferFunctionUi::drawControlPointList(int pointType) const
+{
     // draw control point list
-    if (pointType == 0 ? ui::TreeNode("Alpha Points") : ui::TreeNode("Color Points"))
+    if (pointType == 0 ? ui::TreeNode("Alpha Points")
+            : pointType == 1 ? ui::TreeNode("Color Points")
+            : ui::TreeNode("Style Points"))
     {
         ui::BeginGroup();
         ui::BeginChild(ui::GetID((void*)(intptr_t)pointType), ImVec2(ui::GetContentRegionAvailWidth(), 120), true);
 
         if (pointType == 0)
         {
-            for (auto i = 0; i < transferFunction->getAlphaPoints().size(); i++)
-            {
-                auto& alphaP = transferFunction->getAlphaPoints()[i];
-                auto pAlpha = alphaP.getAlpha();
-
-                ui::PushID(&alphaP);
-                ui::PushItemWidth(ui::GetContentRegionAvailWidth() * 0.5f);
-
-                if (ui::DragFloat("##alpha", &pAlpha, 0.01f, 0.0f, 1.0f))
-                {
-                    transferFunction->setAlpha(i, pAlpha);
-                }
-
-                ui::PopItemWidth();
-                isoValueControl(alphaP, i);
-
-                if (deleteCtrlPoint)
-                {
-                    transferFunction->removeAlphaPoint(i--);
-                    deleteCtrlPoint = false;
-                }
-
-                ui::PopID();
-            }
+            drawAlphaPointList();
         }
         else if (pointType == 1)
         {
-            for (auto i = 0; i < transferFunction->getColorPoints().size(); i++)
-            {
-                auto& colorP = transferFunction->getColorPoints()[i];
-                auto pColor = colorP.getColor();
-
-                ui::PushID(&colorP);
-                ui::PushItemWidth(ui::GetContentRegionAvailWidth() * 0.5f);
-
-                if (ui::ColorEdit3("##color", value_ptr(pColor)))
-                {
-                    transferFunction->setColor(i, pColor);
-                }
-
-                ui::PopItemWidth();
-                isoValueControl(colorP, i);
-
-                if (deleteCtrlPoint)
-                {
-                    transferFunction->removeColorPoint(i--);
-                    deleteCtrlPoint = false;
-                }
-
-                ui::PopID();
-            }
+            drawColorPointList();
+        }
+        else if (pointType == 2)
+        {
+            drawStylePointList();
         }
 
         ui::EndChild();
@@ -323,7 +399,7 @@ void TransferFunctionUi::drawControlPointList(int pointType)
     }
 }
 
-void TransferFunctionUi::drawControlPointCreationUi()
+void TransferFunctionUi::drawControlPointCreationUi() const
 {
     // creation bar
     static int pointType = 0;
@@ -331,34 +407,71 @@ void TransferFunctionUi::drawControlPointCreationUi()
     static float alpha;
     static vec3 color;
     static bool showStylesManager = false;
+    static StylePoint stylePoint;
+
     ui::BeginGroup();
     ui::Separator();
-    ui::RadioButton("Alpha Point", &pointType, 0);
+    ui::Text("Point Type: ");
     ui::SameLine();
-    ui::RadioButton("Color Point", &pointType, 1);
+    ui::RadioButton("Alpha", &pointType, 0);
+    ui::SameLine();
+    ui::RadioButton("Color", &pointType, 1);
+    ui::SameLine();
+    ui::RadioButton("Style", &pointType, 2);
+
     // iso value bar
     ui::SliderInt("Iso Value", &isoValue, 1, 254);
+    ImVec2 sliderSize = ui::GetItemRectSize();
 
     // alpha point
     if (pointType == 0)
     {
         ui::DragFloat("Alpha", &alpha, 0.01f, 0.0f, 1.0f);
     }
-    else // color point
+    else if (pointType == 1) // color point
     {
         ui::ColorEdit3("Color", value_ptr(color));
     }
+    else if (pointType == 2) // style point
+    {
+        if (stylePoint.getStyleIndex() >= 0)
+        {
+            auto& style = stylePoint.getStyle();
+            ui::Image((void *)(intptr_t)style.litsphere->getId(), ImVec2(sliderSize.y, sliderSize.y));
+            ui::SameLine();
+
+            if (ui::Button(style.name.c_str(), ImVec2(sliderSize.x - sliderSize.y - 2, sliderSize.y)))
+            {
+                showStylesManager = true;
+            }
+        }
+        else
+        {
+            if (ui::Button("Select Style", sliderSize)) { showStylesManager = true; }
+        }
+    }
 
     ui::EndGroup();
-    ImVec2 size = ImGui::GetItemRectSize();
+    ImVec2 size = ui::GetItemRectSize();
     ui::SameLine();
     ui::BeginGroup();
+
+    if (pointType == 2 && stylePoint.getStyleIndex() < 0)
+    {
+        ui::PushStyleColor(ImGuiCol_Button, ImVec4(vec4(0.5f)));
+        ui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(vec4(0.5f)));
+        ui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(vec4(0.5f)));
+    }
 
     if (ui::Button("Add Point", ImVec2(ui::GetContentRegionAvailWidth(), size.y / 2)))
     {
         pointType == 0 ? transferFunction->addAlphaPoint(alpha, isoValue)
-            : transferFunction->addColorPoint(color, isoValue);
+            : pointType == 1 ? transferFunction->addColorPoint(color, isoValue) : 0;
+
+        if (pointType == 2 && stylePoint.getStyleIndex() >= 0) { transferFunction->addStylePoint(stylePoint); }
     }
+
+    if (pointType == 2 && stylePoint.getStyleIndex() < 0) { ui::PopStyleColor(3); }
 
     if (ui::Button("Styles Manager", ImVec2(ui::GetContentRegionAvailWidth(), size.y / 2)))
     {
@@ -368,7 +481,10 @@ void TransferFunctionUi::drawControlPointCreationUi()
     if (showStylesManager)
     {
         ui::OpenPopup("Styles Manager");
-        showStylesManager = stylesManagerPopup() == -2;
+        auto selectedStyleIndex = stylesManagerPopup();
+        showStylesManager = selectedStyleIndex == -2;
+
+        if (selectedStyleIndex >= 0) stylePoint = StylePoint(isoValue, selectedStyleIndex);
     }
 
     ui::EndGroup();

@@ -15,8 +15,12 @@ private:
     void drawHistogram(const RaycastVolume& volume) const;
 
     int stylesManagerPopup() const;
-    void drawThresholdControl();
+    void drawThresholdControl() const;
     void drawControlPointsUi() const;
-    void drawControlPointList(int pointType);
-    void drawControlPointCreationUi();
+    void drawPointIsoValueControl(const TransferFunctionPoint& p, const int index, int pointType) const;
+    void drawAlphaPointList() const;
+    void drawColorPointList() const;
+    void drawStylePointList() const;
+    void drawControlPointList(int pointType) const;
+    void drawControlPointCreationUi() const;
 };

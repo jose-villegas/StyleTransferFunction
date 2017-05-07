@@ -4,7 +4,7 @@
 using namespace glm;
 using namespace cinder;
 
-TransferFunction::TransferFunction() : threshold(vec2(0, 255))
+TransferFunction::TransferFunction() : threshold(vec2(0, 255)), updateColorTexture(false)
 {
     colorPoints.push_back(TransferFunctionColorPoint(vec3(1), 0));
     colorPoints.push_back(TransferFunctionColorPoint(vec3(1), 255));
@@ -18,10 +18,7 @@ TransferFunction::~TransferFunction() {}
 void TransferFunction::addColorPoint(const vec3& color, const int isoValue)
 {
     // inserted point is off limits
-    if (isoValue <= 0 || isoValue >= colorPoints.back().getIsoValue() || colorPoints.size() > 255)
-    {
-        return;
-    }
+    if (isoValue <= 0 || isoValue >= colorPoints.back().getIsoValue() || colorPoints.size() > 255) { return; }
 
     auto ctrlP = TransferFunctionColorPoint(color, isoValue);
     // sorted insert
@@ -32,10 +29,7 @@ void TransferFunction::addColorPoint(const vec3& color, const int isoValue)
 void TransferFunction::addAlphaPoint(const float alpha, const int isoValue)
 {
     // inserted point is off limits
-    if (isoValue <= 0 || isoValue >= alphaPoints.back().getIsoValue() || colorPoints.size() > 255)
-    {
-        return;
-    }
+    if (isoValue <= 0 || isoValue >= alphaPoints.back().getIsoValue() || colorPoints.size() > 255) { return; }
 
     auto ctrlP = TransferFunctionAlphaPoint(alpha, isoValue);
     // sorted insert
@@ -46,10 +40,7 @@ void TransferFunction::addAlphaPoint(const float alpha, const int isoValue)
 void TransferFunction::removeColorPoint(const int index)
 {
     // off limits
-    if (index <= 0 || index >= colorPoints.size())
-    {
-        return;
-    }
+    if (index <= 0 || index >= colorPoints.size() - 1) { return; }
 
     colorPoints.erase(colorPoints.begin() + index);
     updateFunction();
@@ -58,10 +49,7 @@ void TransferFunction::removeColorPoint(const int index)
 void TransferFunction::removeAlphaPoint(const int index)
 {
     // off limits
-    if (index <= 0 || index >= alphaPoints.size())
-    {
-        return;
-    }
+    if (index <= 0 || index >= alphaPoints.size() - 1) { return; }
 
     alphaPoints.erase(alphaPoints.begin() + index);
     updateFunction();
@@ -70,10 +58,7 @@ void TransferFunction::removeAlphaPoint(const int index)
 void TransferFunction::setAlpha(const int index, const float alpha)
 {
     // off limits
-    if (index < 0 || index >= alphaPoints.size())
-    {
-        return;
-    }
+    if (index < 0 || index >= alphaPoints.size()) { return; }
 
     alphaPoints[index].setAlpha(clamp(alpha, 0.0f, 1.0f));
     updateFunction();
@@ -214,10 +199,7 @@ const gl::Texture1dRef& TransferFunction::getColorMappingTexture()
 void TransferFunction::setColor(const int index, const vec3& color)
 {
     // off limits
-    if (index < 0 || index >= colorPoints.size())
-    {
-        return;
-    }
+    if (index < 0 || index >= colorPoints.size()) { return; }
 
     colorPoints[index].setColor(clamp(color, vec3(0), vec3(1)));
     updateFunction();
@@ -226,16 +208,10 @@ void TransferFunction::setColor(const int index, const vec3& color)
 void TransferFunction::setAlphaPointIsoValue(const int index, const int isoValue)
 {
     // off limits
-    if (index <= 0 || index >= alphaPoints.size())
-    {
-        return;
-    }
+    if (index <= 0 || index >= alphaPoints.size() - 1) { return; }
 
     // off limits iso val
-    if (isoValue <= 0 || isoValue >= 255)
-    {
-        return;
-    }
+    if (isoValue <= 0 || isoValue >= 255) { return; }
 
     alphaPoints[index].setIsoValue(isoValue);
     
@@ -250,16 +226,10 @@ void TransferFunction::setAlphaPointIsoValue(const int index, const int isoValue
 void TransferFunction::setColorPointIsoValue(const int index, const int isoValue)
 {
     // off limits
-    if (index <= 0 || index >= colorPoints.size())
-    {
-        return;
-    }
+    if (index <= 0 || index >= colorPoints.size() - 1) { return; }
 
     // off limits iso val
-    if (isoValue <= 0 || isoValue >= 255)
-    {
-        return;
-    }
+    if (isoValue <= 0 || isoValue >= 255) { return; }
 
     colorPoints[index].setIsoValue(isoValue);
 
