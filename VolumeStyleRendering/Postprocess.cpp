@@ -102,11 +102,11 @@ PostProcess::PostProcess()
     resizeFbos();
     // post process programs 
     auto toneMappingProg = gl::GlslProg::create(gl::GlslProg::Format()
-        .vertex(loadFile("shaders/fs_quad.vert"))
-        .fragment(loadFile("shaders/tonemapping.frag")));
+        .vertex(loadAsset("shaders/fs_quad.vert"))
+        .fragment(loadAsset("shaders/tonemapping.frag")));
     auto fxaaProg = gl::GlslProg::create(gl::GlslProg::Format()
-        .vertex(loadFile("shaders/fs_quad.vert"))
-        .fragment(loadFile("shaders/fxaa.frag")));
+        .vertex(loadAsset("shaders/fs_quad.vert"))
+        .fragment(loadAsset("shaders/fxaa.frag")));
     // create fs quad for single texture display
     const gl::GlslProgRef stockTexture = gl::context()->getStockShader(gl::ShaderDef().texture(GL_TEXTURE_2D));
     const gl::VboMeshRef rect = gl::VboMesh::create(geom::Rect());

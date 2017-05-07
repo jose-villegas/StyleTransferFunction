@@ -2,7 +2,7 @@
 #include "cinder/gl/gl.h"
 #include "Light.h"
 
-class TransferFunction;
+class StyleTransferFunction;
 
 /**
  * \brief Defines a volume rendered with volume raycasting
@@ -68,7 +68,7 @@ public:
      * \brief Sets the color mapping transfer function, used to set the color of each opacity value
      * \param transferFunction Color transfer function
      */
-    void setTransferFunction(const std::shared_ptr<TransferFunction>& transferFunction);
+    void setTransferFunction(const std::shared_ptr<StyleTransferFunction>& transferFunction);
     /**
      * \brief Enables or disables diffuse shading
      * \param enable Indicates if diffuse shading is enabled
@@ -147,7 +147,7 @@ private:
     // volume raycast
     cinder::gl::GlslProgRef raycastShaderRendertargets;
     cinder::gl::GlslProgRef raycastShaderDirect;
-    std::shared_ptr<TransferFunction> transferFunction;
+    std::shared_ptr<StyleTransferFunction> transferFunction;
 
     // lighting
     Light light;

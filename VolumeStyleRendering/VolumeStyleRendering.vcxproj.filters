@@ -102,9 +102,29 @@
     <None Include="shaders\tonemapping.frag" />
     <None Include="shaders\raycast_rendertargets.frag" />
     <None Include="shaders\fxaa.frag" />
+    <None Include="assets\shaders\fs_quad.vert" />
+    <None Include="assets\shaders\fxaa.frag" />
+    <None Include="assets\shaders\gradients.comp" />
+    <None Include="assets\shaders\histogram.comp" />
+    <None Include="assets\shaders\positions.frag" />
+    <None Include="assets\shaders\positions.vert" />
+    <None Include="assets\shaders\raycast.frag" />
+    <None Include="assets\shaders\raycast.vert" />
+    <None Include="assets\shaders\raycast_rendertargets.frag" />
+    <None Include="assets\shaders\smooth_gradients.comp" />
+    <None Include="assets\shaders\tonemapping.frag" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="images\noise.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="images\default.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="assets\images\default.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="assets\images\noise.png">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

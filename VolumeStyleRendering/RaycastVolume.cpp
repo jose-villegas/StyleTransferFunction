@@ -5,30 +5,31 @@
 #include "RenderingParams.h"
 using namespace ci;
 using namespace glm;
+using namespace app;
 
 RaycastVolume::RaycastVolume() : aspectRatios(1), scaleFactor(vec3(1)), stepScale(1), enableDiffuseShading(true)
 {
     // positions shader
     positionsShader = gl::GlslProg::create(gl::GlslProg::Format()
-        .vertex(loadFile("shaders/positions.vert"))
-        .fragment(loadFile("shaders/positions.frag")));
+        .vertex(loadAsset("shaders/positions.vert"))
+        .fragment(loadAsset("shaders/positions.frag")));
     // raycast shader
     raycastShaderRendertargets = gl::GlslProg::create(gl::GlslProg::Format()
-        .vertex(loadFile("shaders/raycast.vert"))
-        .fragment(loadFile("shaders/raycast_rendertargets.frag")));
+        .vertex(loadAsset("shaders/raycast.vert"))
+        .fragment(loadAsset("shaders/raycast_rendertargets.frag")));
     raycastShaderDirect = gl::GlslProg::create(gl::GlslProg::Format()
-        .vertex(loadFile("shaders/raycast.vert"))
-        .fragment(loadFile("shaders/raycast.frag")));
+        .vertex(loadAsset("shaders/raycast.vert"))
+        .fragment(loadAsset("shaders/raycast.frag")));
     // histogram calculation 
     histogramCompute = gl::GlslProg::create(gl::GlslProg::Format()
-        .compute(loadFile("shaders/histogram.comp")));
+        .compute(loadAsset("shaders/histogram.comp")));
     // gradient computation
     gradientsCompute = gl::GlslProg::create(gl::GlslProg::Format()
-        .compute(loadFile("shaders/gradients.comp")));
+        .compute(loadAsset("shaders/gradients.comp")));
     smoothGradientsCompute = gl::GlslProg::create(gl::GlslProg::Format()
-        .compute(loadFile("shaders/smooth_gradients.comp")));
+        .compute(loadAsset("shaders/smooth_gradients.comp")));
     // noise texture to reduce volume banding artifacts
-    noiseTexture = gl::Texture2d::create(loadImage("images/noise.png"), gl::Texture2d::Format()
+    noiseTexture = gl::Texture2d::create(loadImage(loadAsset("images/noise.png")), gl::Texture2d::Format()
                                          .wrapS(GL_REPEAT)
                                          .wrapT(GL_REPEAT)
                                          .magFilter(GL_NEAREST)
@@ -238,8 +239,11 @@ void RaycastVolume::drawVolume(const Camera& camera, bool toRendertargets)
         gl::ScopedTextureBind backTex(backTexture, 1);
         gl::ScopedTextureBind volumeTex(volumeTexture, 2);
         gl::ScopedTextureBind gradientTex(gradientTexture, 3);
-        gl::ScopedTextureBind trasferTex(transferFunction->getColorMappingTexture(), 4);
-        gl::ScopedTextureBind noiseTex(noiseTexture, 5);
+        gl::ScopedTextureBind noiseTex(noiseTexture, 4);
+        gl::ScopedTextureBind colorTex(transferFunction->getColorMappingTexture(), 5);
+        gl::ScopedTextureBind transferTex(transferFunction->getTransferFunctionTexture(), 6);
+        gl::ScopedTextureBind indexTex(transferFunction->getIndexFunctionTexture(), 7);
+        gl::ScopedTextureBind styleTex(transferFunction->getStyleFunctionTexture(), 8);
 
         // raycast parameters
         program->uniform("threshold", transferFunction->getThreshold());
@@ -254,8 +258,8 @@ void RaycastVolume::drawVolume(const Camera& camera, bool toRendertargets)
         program->uniform("light.ambient", light.ambient);
         program->uniform("light.diffuse", light.diffuse);
         gl::setDefaultShaderVars();
-        
-        if(toRendertargets)
+
+        if (toRendertargets)
         {
             const gl::ScopedFramebuffer scopedFramebuffer(volumeRBuffer);
             {
@@ -268,17 +272,17 @@ void RaycastVolume::drawVolume(const Camera& camera, bool toRendertargets)
             gl::clear();
             // draw cube
             gl::drawElements(gl::toGl(cubeMesh->getPrimitive()), cubeMesh->getNumIndices(),
-                GL_UNSIGNED_INT, static_cast<GLuint *>(nullptr));
+                             GL_UNSIGNED_INT, static_cast<GLuint *>(nullptr));
         }
         else
         {
-            const gl::ScopedViewport scopedViewport(ivec2(0), app::toPixels(app::getWindowSize()));
+            const gl::ScopedViewport scopedViewport(ivec2(0), toPixels(getWindowSize()));
             program->uniform("gamma", RenderingParams::GetGamma());
             program->uniform("exposure", RenderingParams::GetExposure());
             gl::clear();
             // draw cube
             gl::drawElements(gl::toGl(cubeMesh->getPrimitive()), cubeMesh->getNumIndices(),
-                GL_UNSIGNED_INT, static_cast<GLuint *>(nullptr));
+                             GL_UNSIGNED_INT, static_cast<GLuint *>(nullptr));
         }
     }
 }
@@ -290,7 +294,7 @@ void RaycastVolume::resizeFbos()
                                                               .minFilter(GL_NEAREST)
                                                               .wrap(GL_REPEAT)
                                                               .dataType(GL_FLOAT);
-    const ivec2 winSize = app::getWindowSize();
+    const ivec2 winSize = getWindowSize();
     const int32_t h = winSize.y;
     const int32_t w = winSize.x;
 
@@ -395,7 +399,7 @@ const std::array<float, 256> &RaycastVolume::getHistogram() const
     return histogram;
 }
 
-void RaycastVolume::setTransferFunction(const std::shared_ptr<TransferFunction>& transferFunction)
+void RaycastVolume::setTransferFunction(const std::shared_ptr<StyleTransferFunction>& transferFunction)
 {
     this->transferFunction = transferFunction;
 }
@@ -422,17 +426,17 @@ const vec3 &RaycastVolume::getPosition() const { return modelPosition; }
 
 void RaycastVolume::setPosition(const vec3& position) { modelPosition = position; }
 
-const gl::Texture2dRef& RaycastVolume::getColorTexture() const
+const gl::Texture2dRef &RaycastVolume::getColorTexture() const
 {
     return volumeColor;
 }
 
-const gl::Texture2dRef& RaycastVolume::getNormalTexture() const
+const gl::Texture2dRef &RaycastVolume::getNormalTexture() const
 {
     return volumeNormal;
 }
 
-const gl::Texture2dRef& RaycastVolume::getDepthTexture() const
+const gl::Texture2dRef &RaycastVolume::getDepthTexture() const
 {
     return volumeRBuffer->getDepthTexture();
 }

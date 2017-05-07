@@ -84,6 +84,9 @@
       <AdditionalLibraryDirectories>$(VisualStudioDir)\Libraries\Cinder\lib\msw\$(PlatformTarget);$(VisualStudioDir)\Libraries\Cinder\lib\msw\$(PlatformTarget)\$(Configuration)\$(PlatformToolset);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>cinder.lib;OpenGL32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy "$(ProjectDir)assets\*.*" "$(TargetDir)assets" /Y /I /E</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -98,6 +101,9 @@
       <AdditionalLibraryDirectories>$(VisualStudioDir)\Libraries\Cinder\lib\msw\$(PlatformTarget);$(VisualStudioDir)\Libraries\Cinder\lib\msw\$(PlatformTarget)\$(Configuration)\$(PlatformToolset);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>cinder.lib;OpenGL32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy "$(ProjectDir)assets\*.*" "$(TargetDir)assets" /Y /I /E</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -116,6 +122,9 @@
       <AdditionalLibraryDirectories>$(VisualStudioDir)\Libraries\Cinder\lib\msw\$(PlatformTarget);$(VisualStudioDir)\Libraries\Cinder\lib\msw\$(PlatformTarget)\$(Configuration)\$(PlatformToolset);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>cinder.lib;OpenGL32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy "$(ProjectDir)assets\*.*" "$(TargetDir)assets" /Y /I /E</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -134,6 +143,9 @@
       <AdditionalLibraryDirectories>$(VisualStudioDir)\Libraries\Cinder\lib\msw\$(PlatformTarget);$(VisualStudioDir)\Libraries\Cinder\lib\msw\$(PlatformTarget)\$(Configuration)\$(PlatformToolset);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>cinder.lib;OpenGL32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy "$(ProjectDir)assets\*.*" "$(TargetDir)assets" /Y /I /E</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="CubicSpline.cpp" />
@@ -164,6 +176,17 @@
     <ClInclude Include="RaycastVolume.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="assets\shaders\fs_quad.vert" />
+    <None Include="assets\shaders\fxaa.frag" />
+    <None Include="assets\shaders\gradients.comp" />
+    <None Include="assets\shaders\histogram.comp" />
+    <None Include="assets\shaders\positions.frag" />
+    <None Include="assets\shaders\positions.vert" />
+    <None Include="assets\shaders\raycast.frag" />
+    <None Include="assets\shaders\raycast.vert" />
+    <None Include="assets\shaders\raycast_rendertargets.frag" />
+    <None Include="assets\shaders\smooth_gradients.comp" />
+    <None Include="assets\shaders\tonemapping.frag" />
     <None Include="shaders\fs_quad.vert" />
     <None Include="shaders\fxaa.frag" />
     <None Include="shaders\gradients.comp" />
@@ -177,6 +200,9 @@
     <None Include="shaders\smooth_gradients.comp" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="assets\images\default.png" />
+    <Image Include="assets\images\noise.png" />
+    <Image Include="images\default.png" />
     <Image Include="images\noise.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

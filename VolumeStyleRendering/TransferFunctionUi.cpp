@@ -79,10 +79,11 @@ void TransferFunctionUi::drawHistogram(const RaycastVolume& volume) const
 int TransferFunctionUi::stylesManagerPopup() const
 {
     auto selectedStyle = -2;
+    auto styleCount = "   (" + std::to_string(Style::GetAvailableStyles().size()) + "/128)";
 
     if (ui::BeginPopupModal("Styles Manager", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
     {
-        ui::BeginChild("#stylesManager", ImVec2(app::getWindowWidth() * .3, app::getWindowHeight() * .7), true);
+        ui::BeginChild("##styleList", ImVec2(app::getWindowWidth() * .3, app::getWindowHeight() * .7), true);
         static ImU32 gray = ImColor(0.5f, 0.5f, 0.5f, 0.5f);
         ImDrawList* drawList = ui::GetWindowDrawList();
         ImGuiStyle& uiStyle = ui::GetStyle();
@@ -94,6 +95,7 @@ int TransferFunctionUi::stylesManagerPopup() const
         {
             auto& style = styles[i];
             auto cursor = ui::GetCursorScreenPos();
+            auto name = style.getName();
 
             // background rect for style
             drawList->AddRectFilled(cursor, ImVec2(cursor.x + ui::GetContentRegionAvailWidth(), cursor.y + 76),
@@ -102,26 +104,35 @@ int TransferFunctionUi::stylesManagerPopup() const
             ui::Dummy(ImVec2(0, 4));
             ui::BeginGroup();
             ui::Indent(4);
-            ui::Image((void *)(intptr_t)style.litsphere->getId(), ImVec2(64, 64));
+            ui::Image((void *)(intptr_t)style.getTexture()->getId(), ImVec2(64, 64));
 
             if (ui::IsItemHovered())
             {
-                ui::SetTooltip(style.filepath.c_str());
+                ui::SetTooltip(style.getFilepath().c_str());
             }
 
             ui::Unindent(4);
             ui::EndGroup();
             ui::SameLine();
-            ui::PushID(style.filepath.c_str());
+            ui::PushID(style.getFilepath().c_str());
             ui::BeginGroup();
 
-            if (ui::InputText("Name", &style.name)) { Style::RenameStyle(i, style.name); }
-            int inputHeight = ui::GetItemRectSize().y;
+            if (ui::InputText("Name", &name)) { Style::RenameStyle(i, name); }
 
-            if (ui::Button("Select", ImVec2(ui::GetContentRegionAvailWidth() - 4, 64 - inputHeight)))
+            int inputHeight = ui::GetItemRectSize().y;
+            int width = ui::GetContentRegionAvailWidth();
+
+            if (ui::Button("Select", ImVec2(width * .5 - 6, 64 - inputHeight)))
             {
                 ui::CloseCurrentPopup();
                 selectedStyle = i;
+            }
+
+            ui::SameLine();
+
+            if (i > 0 && ui::Button("Delete", ImVec2(width * .5 - 6, 64 - inputHeight)))
+            {
+                Style::RemoveStyle(i--);
             }
 
             ui::EndGroup();
@@ -130,6 +141,7 @@ int TransferFunctionUi::stylesManagerPopup() const
         }
 
         ui::EndChild();
+        ui::TextDisabled(styleCount.c_str());
 
         if (ui::Button("Load Litsphere / Matcap", ImVec2(ui::GetContentRegionAvailWidth(), 0)))
         {
@@ -142,11 +154,8 @@ int TransferFunctionUi::stylesManagerPopup() const
                 Surface resizedImage(512, 512, true, SurfaceChannelOrder::RGBA);
                 ip::resize(baseImage, &resizedImage);
 
-                Style::AddStyle({
-                    fsPath.filename().string(),
-                    gl::Texture2d::create(resizedImage),
-                    fsPath.string()
-                });
+                Style::AddStyle(Style(fsPath.filename().string(), resizedImage,
+                                      gl::Texture2d::create(resizedImage), fsPath.string()));
             }
         }
 
@@ -197,7 +206,7 @@ void TransferFunctionUi::drawControlPointsUi() const
 
     for (auto& styleP : stylePoints)
     {
-        const auto img = (void*)(intptr_t)styleP.getStyle().litsphere->getId();
+        const auto img = (void*)(intptr_t)styleP.getStyle().getTexture()->getId();
         drawList->AddImage(img, ImVec2(p.x + step * styleP.getIsoValue() + 4.0f - 8, y - 8),
                            ImVec2(p.x + step * styleP.getIsoValue() + 4.0f + 16 - 8, y + 16 - 8));
     }
@@ -329,11 +338,13 @@ void TransferFunctionUi::drawStylePointList() const
         auto style = styleP.getStyle();
 
         ui::PushID(&styleP);
-        ui::Image((void *)(intptr_t)style.litsphere->getId(), ImVec2(height, height));
+        ui::Image((void *)(intptr_t)style.getTexture()->getId(), ImVec2(height, height));
         ui::SameLine();
         ui::PushItemWidth(ui::GetContentRegionAvailWidth() * 0.4f - 32);
 
-        if (ui::InputText("##name", &style.name)) { Style::RenameStyle(styleP.getStyleIndex(), style.name); }
+        auto name = style.getName();
+
+        if (ui::InputText("##name", &name)) { Style::RenameStyle(styleP.getStyleIndex(), name); }
 
         ui::PopItemWidth();
         ui::SameLine();
@@ -436,11 +447,12 @@ void TransferFunctionUi::drawControlPointCreationUi() const
     {
         if (stylePoint.getStyleIndex() >= 0)
         {
+            stylePoint.setIsoValue(isoValue);
             auto& style = stylePoint.getStyle();
-            ui::Image((void *)(intptr_t)style.litsphere->getId(), ImVec2(sliderSize.y, sliderSize.y));
+            ui::Image((void *)(intptr_t)style.getTexture()->getId(), ImVec2(sliderSize.y, sliderSize.y));
             ui::SameLine();
 
-            if (ui::Button(style.name.c_str(), ImVec2(sliderSize.x - sliderSize.y - 2, sliderSize.y)))
+            if (ui::Button(style.getName().c_str(), ImVec2(sliderSize.x - sliderSize.y - 2, sliderSize.y)))
             {
                 showStylesManager = true;
             }
