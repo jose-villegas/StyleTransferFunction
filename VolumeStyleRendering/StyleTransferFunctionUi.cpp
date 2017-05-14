@@ -118,20 +118,39 @@ void StyleTransferFunctionUi::loadTransferFunctionJSON(const JsonTree& second) c
 
     for (auto& aP : second["alpha_points"].getChildren())
     {
-        transferFunction->addAlphaPoint(aP["alpha"].getValue<float>(), aP["iso_value"].getValue<int>());
+        int isoVal = aP["iso_value"].getValue<int>();
+
+        if (isoVal > 0 && isoVal < 256)
+        {
+            transferFunction->addAlphaPoint(aP["alpha"].getValue<float>(), isoVal);
+        }
+        else
+        {
+            transferFunction->setAlpha(isoVal == 0 ? 0 : transferFunction->getAlphaPoints().size() - 1,
+                                       aP["alpha"].getValue<float>());
+        }
     }
 
     for (auto& cP : second["color_points"].getChildren())
     {
         vec3 color;
         int i = 0;
+        int isoVal = cP["iso_value"].getValue<int>();
 
         for (auto& c : cP["color"].getChildren())
         {
             color[i++] = c.getValue<float>();
         }
 
-        transferFunction->addColorPoint(color, cP["iso_value"].getValue<int>());
+        if (isoVal > 0 && isoVal < 256)
+        {
+            transferFunction->addColorPoint(color, isoVal);
+        }
+        else
+        {
+            transferFunction->setColor(isoVal == 0 ? 0 : transferFunction->getAlphaPoints().size() - 1,
+                                       color);
+        }
     }
 }
 
@@ -513,6 +532,8 @@ void StyleTransferFunctionUi::drawTransferFunctionsManager(bool& showTFManager)
                 loadTransferFunctionJSON(f.second);
             }
 
+            ui::SameLine();
+
             if (ui::Button("X")) { removeIndex = selectedId - 1; }
 
             ui::EndGroup();
@@ -521,13 +542,40 @@ void StyleTransferFunctionUi::drawTransferFunctionsManager(bool& showTFManager)
 
         ui::EndChild();
 
-        if (ui::Button("Save", ImVec2(71, 0)))
+        if (ui::Button("Add"))
         {
             savedTransferFunctions.push_back({"New Function", buildTransferFunctionJSON()});
         }
 
         ui::SameLine();
-        ui::Button("Load", ImVec2(71, 0));
+
+        if (ui::Button("Save"))
+        {
+            static fs::path fsPath;
+            fsPath = app::getSaveFilePath(fsPath, {"stf"});
+
+            if (!fsPath.empty())
+            {
+                if (!fsPath.has_extension()) fsPath += ".stf";
+
+                buildTransferFunctionJSON().write(fsPath);
+            }
+        }
+
+        ui::SameLine();
+
+        if (ui::Button("Load"))
+        {
+            static fs::path fsPath;
+            fsPath = app::getOpenFilePath(fsPath, {"stf"});
+
+            if (!fsPath.empty())
+            {
+                savedTransferFunctions.push_back({fsPath.filename().string(), JsonTree(loadFile(fsPath))});
+                loadTransferFunctionJSON(savedTransferFunctions.back().second);
+            }
+        }
+
         ui::End();
 
         if (removeIndex >= 0) { savedTransferFunctions.erase(savedTransferFunctions.begin() + removeIndex); }
