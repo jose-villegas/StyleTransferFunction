@@ -11,35 +11,85 @@ public:
      */
     void displayTexture(const ci::gl::Texture2dRef colorTex = nullptr) const;
     /**
+    * \brief Displays the given texture with fast approximate anti-aliasing post effect
+    * \param texture The color buffer texture
+    */
+    void displayFXAA(const ci::gl::Texture2dRef &texture = nullptr) const;
+    /**
      * \brief Reinhard tonemapping and gamma correction
      * \param hdrBuffer An unclampled (floating point) color buffer
+     * \param local if true will call Start and End and the beginning and the end of function respectively
      */
-    void toneMapping(const cinder::gl::Texture2dRef& hdrBuffer) const;
+    void toneMapping(const ci::gl::Texture2dRef& hdrBuffer = nullptr, bool local = true) const;
+    /**
+     * \brief Horizontal pass to generate a gaussian blurred texture from the given texture
+     * \param texture The source texture to blur, if null uses the current color texture
+     * \param local if true will call Start and End and the beginning and the end of function respectively
+     */
+    void blurHorizontal(const ci::gl::Texture2dRef& texture = nullptr, bool local = true) const;
+    /**
+    * \brief Horizontal pass to generate a gaussian blurred texture from the given texture
+    * \param texture The source texture to blur, if null uses the current color texture
+    * \param local if true will call Start and End and the beginning and the end of function respectively
+    */
+    void blurVertical(const ci::gl::Texture2dRef& texture = nullptr, bool local = true) const;
+    /**
+     * \brief Generates de inverse of the given texture
+     * \param texture The source texture, if null uses the current color texture
+     * \param local if true will call Start and End and the beginning and the end of function respectively
+     */
+    void inverse(const ci::gl::Texture2dRef& texture = nullptr, bool local = true) const;
+    /**
+     * \brief Multiplies the given textures
+     * \param texture0 The right source texture for multiplication
+     * \param texture0 The left source texture for multiplication, if null uses the current color texture
+     * \param local if true will call Start and End and the beginning and the end of function respectively
+     */
+    void multiply(const ci::gl::Texture2dRef& texture0, const ci::gl::Texture2dRef& texture1 = nullptr, bool local = true) const;
+
+    /**
+     * \brief Sets the appropiate flags for fullscreen effects and binds the internal Fbo for drawing
+     */
+    static void Start();
+    /**
+     * \brief Restores the previous rendering flags and unbinds the internal Fbo
+     */
+    static void End();
     /**
      * \brief The temporal color texture contains the output color result of
      * the last post-process effect executed
      * \return The temporal color texture
      */
-    const ci::gl::Texture2dRef &getTemporalColorTexture() const;
-    /**
-     * \brief Fast approximate anti-aliasing post effect
-     * \param texture The color buffer texture
-     */
-    void FXAA(const cinder::gl::Texture2dRef &texture = nullptr) const;
+    const ci::gl::Texture2dRef &getColorTexture() const;
     /**
      * \brief Resizes the created framebuffers to the actual window's size
      */
     void resizeFbos();
-    PostProcess();
-    ~PostProcess();
+    /**
+     * \brief PostProcess follows a singleton pattern
+     * \return The unique PostProcess instance
+     */
+    static PostProcess& instance();
 private:
     // fs screen effects
     ci::gl::BatchRef textureRect;
     ci::gl::BatchRef toneMappingRect;
     ci::gl::BatchRef fxaaRect;
+    ci::gl::BatchRef blurRect;
+    ci::gl::BatchRef inverseRect;
+    ci::gl::BatchRef multiplyRect;
 
-    // temporal texture
-    ci::gl::Texture2dRef temporalTexture;
-    ci::gl::FboRef temporalFbo;
+    // current color texture
+    ci::gl::Texture2dRef colorTexture;
+    ci::gl::FboRef colorFbo;
+    // auxiliary for when trying to write to itself
+    ci::gl::Texture2dRef auxiliaryTexture;
+    ci::gl::FboRef auxiliaryFbo;
+
+    // draw to this fbo
+    ci::gl::FboRef currentFbo;
+
+    void swapFbo();
+    PostProcess();
 };
 

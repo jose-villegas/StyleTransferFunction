@@ -1,11 +1,11 @@
-#include "TransferFunctionUi.h"
+#include "StyleTransferFunctionUi.h"
 #include "RaycastVolume.h"
 #include "CinderImGui.h"
 #include "cinder/ip/Resize.h"
 using namespace glm;
 using namespace ci;
 
-void TransferFunctionUi::drawThresholdControl() const
+void StyleTransferFunctionUi::drawThresholdControl() const
 {
     // draw threshold indicator
     const ImVec2 p = ui::GetCursorScreenPos();
@@ -43,7 +43,7 @@ void TransferFunctionUi::drawThresholdControl() const
     ui::EndGroup();
 }
 
-void TransferFunctionUi::drawUi(bool& open, const RaycastVolume& volume)
+void StyleTransferFunctionUi::drawUi(bool& open, const RaycastVolume& volume)
 {
     if (open)
     {
@@ -56,19 +56,19 @@ void TransferFunctionUi::drawUi(bool& open, const RaycastVolume& volume)
     }
 }
 
-TransferFunctionUi::TransferFunctionUi()
+StyleTransferFunctionUi::StyleTransferFunctionUi()
 {
     transferFunction = std::make_shared<StyleTransferFunction>();
 }
 
-TransferFunctionUi::~TransferFunctionUi() {}
+StyleTransferFunctionUi::~StyleTransferFunctionUi() {}
 
-const std::shared_ptr<StyleTransferFunction> &TransferFunctionUi::getTranferFunction() const
+const std::shared_ptr<StyleTransferFunction> &StyleTransferFunctionUi::getTranferFunction() const
 {
     return transferFunction;
 }
 
-void TransferFunctionUi::drawHistogram(const RaycastVolume& volume) const
+void StyleTransferFunctionUi::drawHistogram(const RaycastVolume& volume) const
 {
     ui::BeginGroup();
     auto& histogram = volume.getHistogram();
@@ -76,7 +76,7 @@ void TransferFunctionUi::drawHistogram(const RaycastVolume& volume) const
     ui::EndGroup();
 }
 
-int TransferFunctionUi::stylesManagerPopup() const
+int StyleTransferFunctionUi::stylesManagerPopup() const
 {
     auto selectedStyle = -2;
     auto styleCount = "   (" + std::to_string(Style::GetAvailableStyles().size()) + "/128)";
@@ -171,7 +171,7 @@ int TransferFunctionUi::stylesManagerPopup() const
     return selectedStyle;
 }
 
-void TransferFunctionUi::drawControlPointsUi() const
+void StyleTransferFunctionUi::drawControlPointsUi() const
 {
     const ImVec2 p = ui::GetCursorScreenPos();
     ImDrawList* drawList = ui::GetWindowDrawList();
@@ -232,7 +232,7 @@ void TransferFunctionUi::drawControlPointsUi() const
     ui::Dummy(ImVec2(width, sz + 15.0f));
 }
 
-void TransferFunctionUi::drawPointIsoValueControl(const TransferFunctionPoint& p, const int index, int pointType) const
+void StyleTransferFunctionUi::drawPointIsoValueControl(const TransferFunctionPoint& p, const int index, int pointType) const
 {
     int pIso = p.getIsoValue();
     ui::SameLine();
@@ -261,7 +261,7 @@ void TransferFunctionUi::drawPointIsoValueControl(const TransferFunctionPoint& p
     ui::PopItemWidth();
 }
 
-void TransferFunctionUi::drawAlphaPointList() const
+void StyleTransferFunctionUi::drawAlphaPointList() const
 {
     for (auto i = 0; i < transferFunction->getAlphaPoints().size(); i++)
     {
@@ -293,7 +293,7 @@ void TransferFunctionUi::drawAlphaPointList() const
     }
 }
 
-void TransferFunctionUi::drawColorPointList() const
+void StyleTransferFunctionUi::drawColorPointList() const
 {
     for (auto i = 0; i < transferFunction->getColorPoints().size(); i++)
     {
@@ -325,7 +325,7 @@ void TransferFunctionUi::drawColorPointList() const
     }
 }
 
-void TransferFunctionUi::drawStylePointList() const
+void StyleTransferFunctionUi::drawStylePointList() const
 {
     static bool showStyleManager = false;
     static int stylePointChangeIndex = -1;
@@ -381,7 +381,7 @@ void TransferFunctionUi::drawStylePointList() const
     }
 }
 
-void TransferFunctionUi::drawControlPointList(int pointType) const
+void StyleTransferFunctionUi::drawControlPointList(int pointType) const
 {
     // draw control point list
     if (pointType == 0 ? ui::TreeNode("Alpha Points")
@@ -410,7 +410,7 @@ void TransferFunctionUi::drawControlPointList(int pointType) const
     }
 }
 
-void TransferFunctionUi::drawControlPointCreationUi() const
+void StyleTransferFunctionUi::drawControlPointCreationUi() const
 {
     // creation bar
     static int pointType = 0;

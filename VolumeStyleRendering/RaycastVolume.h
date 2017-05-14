@@ -24,7 +24,7 @@ public:
      * \param toRendertargets If true it renders the raycasting result to color, normal and depth render targets
      */
 
-    void drawVolume(const cinder::Camera& camera, bool toRendertargets);
+    void writeRendertargets(const cinder::Camera& camera);
     /**
      * \brief Updates frame buffer objects to the current size of the main window
      */
@@ -69,11 +69,6 @@ public:
      * \param transferFunction Color transfer function
      */
     void setTransferFunction(const std::shared_ptr<StyleTransferFunction>& transferFunction);
-    /**
-     * \brief Enables or disables diffuse shading
-     * \param enable Indicates if diffuse shading is enabled
-     */
-    void diffuseShading(bool enable);
     /**
      * \brief Sets the volume raycast directional light
      * \param direction Light's direction
@@ -141,15 +136,13 @@ private:
     ci::gl::FboRef backFbo;
     ci::gl::FboRef volumeRBuffer;
 
-    // draw positions shader
-    ci::gl::GlslProgRef positionsShader;
-
     // volume raycast
-    cinder::gl::GlslProgRef raycastShaderRendertargets;
-    cinder::gl::GlslProgRef raycastShaderDirect;
+    ci::gl::GlslProgRef raycastShaderRendertargets;
+    ci::gl::GlslProgRef positionsProg;
     std::shared_ptr<StyleTransferFunction> transferFunction;
 
     // lighting
+    ci::gl::GlslProgRef applyBlurredShadows;
     Light light;
 
     // compute shaders
@@ -163,6 +156,7 @@ private:
     ci::gl::Texture2dRef backTexture;
     ci::gl::Texture2dRef volumeNormal;
     ci::gl::Texture2dRef volumeColor;
+    ci::gl::Texture2dRef volumeShadows;
 
     // raycast parameters
     ci::gl::Texture2dRef noiseTexture;
@@ -172,7 +166,6 @@ private:
     glm::vec3 scaleFactor;
     float stepScale;
     float maxSize;
-    bool enableDiffuseShading;
 
     // model
     bool isDrawable;

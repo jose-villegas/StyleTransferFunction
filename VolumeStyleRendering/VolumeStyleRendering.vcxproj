@@ -159,7 +159,7 @@
     <ClCompile Include="VolumeRenderingAppUi.cpp" />
     <ClCompile Include="TransferFunction.cpp" />
     <ClCompile Include="TransferFunctionPoint.cpp" />
-    <ClCompile Include="TransferFunctionUi.cpp" />
+    <ClCompile Include="StyleTransferFunctionUi.cpp" />
     <ClCompile Include="RaycastVolume.cpp" />
     <ClCompile Include="VolumeRenderingApp.cpp" />
   </ItemGroup>
@@ -172,17 +172,17 @@
     <ClInclude Include="VolumeRenderingAppUi.h" />
     <ClInclude Include="TransferFunction.h" />
     <ClInclude Include="TransferFunctionPoint.h" />
-    <ClInclude Include="TransferFunctionUi.h" />
+    <ClInclude Include="StyleTransferFunctionUi.h" />
     <ClInclude Include="RaycastVolume.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="assets\shaders\blur.frag" />
     <None Include="assets\shaders\fs_quad.vert" />
     <None Include="assets\shaders\fxaa.frag" />
     <None Include="assets\shaders\gradients.comp" />
     <None Include="assets\shaders\histogram.comp" />
     <None Include="assets\shaders\positions.frag" />
     <None Include="assets\shaders\positions.vert" />
-    <None Include="assets\shaders\raycast.frag" />
     <None Include="assets\shaders\raycast.vert" />
     <None Include="assets\shaders\raycast_rendertargets.frag" />
     <None Include="assets\shaders\smooth_gradients.comp" />

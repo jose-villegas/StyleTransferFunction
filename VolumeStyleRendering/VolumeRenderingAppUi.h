@@ -5,7 +5,6 @@ class RaycastVolume;
 class VolumeRenderingAppUi
 {
 public:
-    static bool PostProcessingEnabled();
     static void DrawUi(RaycastVolume &volume);
 private:
     static bool VolumeLoadPopup(RaycastVolume &volume);
@@ -14,7 +13,6 @@ private:
     static void DrawRotationControls(RaycastVolume &volume);
     static void DrawMainMenuBar(RaycastVolume &volume);
 
-    static bool enablePostProcessing;
     static bool loadNewVolume;
     static bool showVolumeOptions;
     static bool showRendering;

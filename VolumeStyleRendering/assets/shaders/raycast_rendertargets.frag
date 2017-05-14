@@ -19,16 +19,18 @@ layout(binding=8) uniform sampler2DArray styleFunction;
 uniform mat3 ciModelMatrixInverseTranspose;
 uniform Light light;
 
-uniform ivec2 threshold;
+uniform vec2 threshold;
 uniform vec3 stepSize;
 uniform int iterations;
 uniform bool diffuseShading;
+uniform bool raycastShadows;
 uniform float stepScale;
 
 in vec4 position;
 
 layout (location=0) out vec4 oColor;
 layout (location=1) out vec3 oNormal;
+layout (location=2) out float oShadow;
 
 // Spheremap Transform for normal encoding. Used in Cry Engine 3, presented by 
 // Martin Mittring in "A bit more Deferred", p. 13
@@ -55,7 +57,7 @@ vec2 litsphere (vec3 eye, vec3 normal)
     return reflected.xy / m + 0.5;
 }
 
-vec4 stylemapping (vec3 eye, vec3 normal, float opacity)
+vec4 styleMapping (vec3 eye, vec3 normal, float opacity)
 {
     // apply litsphere
     float index = texture(transferFunction, opacity).x;
@@ -80,6 +82,35 @@ vec4 stylemapping (vec3 eye, vec3 normal, float opacity)
     return styleIndex0 < 0 ? style1 : styleIndex1 < 0 ? style0 : mix(style0, style1, weight);
 }
 
+float voxelOcclusion(vec3 rayStart, vec3 rayDir)
+{
+    vec3 step = rayDir * 2.0f * stepSize;
+    vec3 pos = rayStart + step;
+
+    for(int i = 0; i < iterations; i++)
+    {
+        float opacity = texture(volume, pos).x;
+
+        if(opacity >= threshold.x && opacity <= threshold.y)
+        {
+            // assigned color from transfer function for this density
+            vec4 src = texture(colorMappingFunction, opacity);
+
+            // voxel is occluded
+            if(src.a >= 0.95) 
+                return 1.0;
+        }
+
+        pos += step;
+
+        // out of bounds
+        if (pos.x >= 1.0 || pos.y >= 1.0 || pos.z >= 1.0) 
+            return 0.0;
+    }
+
+    return 0.0;
+}
+
 void main(void)
 {
     vec2 texC = position.xy / position.w;
@@ -90,7 +121,7 @@ void main(void)
     vec3 back = texture(cubeBack, texC).xyz;
     
     vec3 dir = normalize(back - front);
-    vec4 pos = vec4(front, 0);
+    vec3 pos = front;
 
     vec4 dst = vec4(0, 0, 0, 0);
     vec4 src = vec4(0, 0, 0, 0);
@@ -100,27 +131,25 @@ void main(void)
     vec3 step = dir * stepSize;
     
     // jitter ray starting position to reduce artifacts
-    pos.xyz += step * texture(bakedNoise, gl_FragCoord.xy / 256).x;
+    pos += step * texture(bakedNoise, gl_FragCoord.xy / 256).x;
 
     for(int i = 0; i < iterations; i++)
     {
-        pos.w = 0;
-        value.a = texture(volume, pos.xyz).x;
-        int isoValue = int(255.0f * value.a);
+        value.a = texture(volume, pos).x;
 
-        if(isoValue >= threshold.x && isoValue <= threshold.y)
+        if(value.a >= threshold.x && value.a <= threshold.y)
         {
             // assigned color from transfer function for this density
             src = texture(colorMappingFunction, value.a);
 
             // gradient value
-            value.xyz = decode(texture(gradients, pos.xyz).xy);
+            value.xyz = decode(texture(gradients, pos).xy);
             vec3 normal = normalize(ciModelMatrixInverseTranspose * value.xyz);
 
             // style transfer
-            src *= stylemapping(pos.xyz, normal, value.a);
+            src *= styleMapping(pos, normal, value.a);
 
-            // oppacity correction
+            // opacity correction
             src.a = 1 - pow((1 - src.a), stepScale / 0.5);
 
             if(diffuseShading)
@@ -140,14 +169,20 @@ void main(void)
                 break;
         }
 
-        pos.xyz += step;
+        pos += step;
 
         // out of bounds
         if (pos.x > 1.0 || pos.y > 1.0 || pos.z > 1.0) 
             break;
     }
 
-    oColor = vec4(dst.rgb, 1.0);
+    if(raycastShadows)
+    {
+        vec3 lightDir = normalize(-light.direction);
+        oShadow = voxelOcclusion(pos, -lightDir) * 0.5;
+    }
+
+    oColor = dst;
     oNormal = value.xyz;
     gl_FragDepth = pos.z;
 }

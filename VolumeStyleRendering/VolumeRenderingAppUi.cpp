@@ -1,11 +1,10 @@
 #include "VolumeRenderingAppUi.h"
 #include "RaycastVolume.h"
 #include "CinderImGui.h"
-#include "TransferFunctionUi.h"
+#include "StyleTransferFunctionUi.h"
 #include "RenderingParams.h"
 using namespace glm;
 
-bool VolumeRenderingAppUi::enablePostProcessing = true;
 bool VolumeRenderingAppUi::loadNewVolume = false;
 bool VolumeRenderingAppUi::showVolumeOptions = false;
 bool VolumeRenderingAppUi::showRendering = false;
@@ -13,11 +12,6 @@ bool VolumeRenderingAppUi::showTransferFunction = false;
 bool VolumeRenderingAppUi::showRotationControls = false;
 bool VolumeRenderingAppUi::showLightingSetup = false;
 std::string VolumeRenderingAppUi::path;
-
-bool VolumeRenderingAppUi::PostProcessingEnabled()
-{
-    return enablePostProcessing;
-}
 
 void VolumeRenderingAppUi::DrawUi(RaycastVolume& volume)
 {
@@ -40,11 +34,11 @@ void VolumeRenderingAppUi::DrawUi(RaycastVolume& volume)
     }
 
     // initialize transfer function ui
-    static std::shared_ptr<TransferFunctionUi> transferFunctionUi = nullptr;
+    static std::shared_ptr<StyleTransferFunctionUi> transferFunctionUi = nullptr;
 
     if(!transferFunctionUi)
     {
-        transferFunctionUi = std::make_shared<TransferFunctionUi>();
+        transferFunctionUi = std::make_shared<StyleTransferFunctionUi>();
         volume.setTransferFunction(transferFunctionUi->getTranferFunction());
     }
     else
@@ -86,16 +80,19 @@ void VolumeRenderingAppUi::DrawRenderingOptions(RaycastVolume& volume)
             RenderingParams::SetExposure(exposure);
         }
 
-        ui::Checkbox("Enable Post-processing", &enablePostProcessing);
+        ui::Separator();
+        ui::Text("Post-effects");
 
-        if(enablePostProcessing)
+        if(ui::TreeNode("FXAA"))
         {
             static bool fxaa = RenderingParams::FXAAEnabled();
 
-            if (ui::Checkbox("FXAA", &fxaa))
+            if (ui::Checkbox("Enable", &fxaa))
             {
                 RenderingParams::FXAAEnabled(fxaa);
             }
+
+            ui::TreePop();
         }
 
         ui::End();
@@ -110,12 +107,18 @@ void VolumeRenderingAppUi::DrawLightingSetup(RaycastVolume& volume)
         static float lightIntensity = 1.0f;
         static vec3 rotation;
         static bool doShading = true;
+        static bool shadows = true;;
         bool changed = false;
         ui::Begin("Lighting", &showLightingSetup, ImGuiWindowFlags_AlwaysAutoResize);
 
         if (ui::Checkbox("Enable Diffuse Shading", &doShading))
         {
-            volume.diffuseShading(doShading);
+            RenderingParams::DiffuseShadingEnabled(doShading);
+        }
+
+        if (ui::Checkbox("Enable Shadows", &shadows))
+        {
+            RenderingParams::ShadowsEnabled(shadows);
         }
 
         changed |= ui::SliderFloat3("Rotation", value_ptr(rotation), -180, 180);

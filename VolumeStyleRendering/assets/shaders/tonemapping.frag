@@ -5,7 +5,7 @@ uniform float gamma;
 uniform float exposure;
 
 in vec2 uvs;
-out vec4 fragmentColor;
+out vec4 oColor;
 
 vec3 ACESFilm( vec3 x )
 {
@@ -26,5 +26,5 @@ void main()
     // Gamma correction 
     mapped = pow(mapped, vec3(1.0 / gamma));
   
-    fragmentColor = vec4(mapped, 1.0);
+    oColor = vec4(mapped, 1.0);
 }

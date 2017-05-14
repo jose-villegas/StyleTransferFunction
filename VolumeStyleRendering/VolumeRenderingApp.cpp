@@ -25,7 +25,6 @@ public:
 private:
     vec2 dragStart;
     RaycastVolume volume;
-    PostProcess postProcess;
     CameraPersp camera;
     CameraPersp initialCamera;
     float dragPivotDistance{0.0f};
@@ -38,8 +37,8 @@ void VolumeRenderingApp::prepareSettings(Settings* settings)
 
 void VolumeRenderingApp::setup()
 {
-    auto options = ImGui::Options();
-    options.font("fonts/DroidSans.ttf", 16);
+    auto options = ui::Options();
+    options.font(app::getAssetPath("fonts/DroidSans.ttf"), 16);
     ui::initialize(options);
     // set camera initial setup
     camera.lookAt(vec3(0, 0, -4), vec3(0), vec3(0, 1, 0));
@@ -56,22 +55,7 @@ void VolumeRenderingApp::draw()
     // volume raycasting
     {
         volume.setPosition(-volume.centerPoint());
-        volume.drawVolume(camera, VolumeRenderingAppUi::PostProcessingEnabled());
-    }
-    // post-process
-    if (VolumeRenderingAppUi::PostProcessingEnabled())
-    {
-        postProcess.toneMapping(volume.getColorTexture());
-
-        // anti aliasing
-        if(RenderingParams::FXAAEnabled())
-        {
-            postProcess.FXAA();
-        }
-        else
-        {
-            postProcess.displayTexture();
-        }
+        volume.writeRendertargets(camera);
     }
 }
 
@@ -80,7 +64,7 @@ void VolumeRenderingApp::resize()
     camera.setAspectRatio(getWindowAspectRatio());
     // update frame buffers
     volume.resizeFbos();
-    postProcess.resizeFbos();
+    PostProcess::instance().resizeFbos();
 }
 
 void VolumeRenderingApp::mouseWheel(MouseEvent event)

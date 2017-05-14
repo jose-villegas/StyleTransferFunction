@@ -5,6 +5,8 @@ using namespace glm;
 float RenderingParams::gammaValue = 2.2f;
 float RenderingParams::exposureValue = 1.0f;
 bool RenderingParams::fxaa = true;
+bool RenderingParams::diffuseShading = true;
+bool RenderingParams::shadows = true;
 
 float RenderingParams::GetExposure() 
 {
@@ -34,4 +36,24 @@ void RenderingParams::FXAAEnabled(const bool enabled)
 bool RenderingParams::FXAAEnabled()
 {
     return fxaa;
+}
+
+void RenderingParams::DiffuseShadingEnabled(const bool enabled)
+{
+    diffuseShading = enabled;
+}
+
+bool RenderingParams::DiffuseShadingEnabled()
+{
+    return diffuseShading;
+}
+
+void RenderingParams::ShadowsEnabled(const bool enabled)
+{
+    shadows = enabled;
+}
+
+bool RenderingParams::ShadowsEnabled()
+{
+    return shadows;
 }

@@ -1,25 +1,23 @@
 #include "RaycastVolume.h"
 #include <cinder/app/AppBase.h>
 #include <cinder/Log.h>
-#include "TransferFunctionUi.h"
+#include "StyleTransferFunctionUi.h"
 #include "RenderingParams.h"
+#include "PostProcess.h"
 using namespace ci;
 using namespace glm;
 using namespace app;
 
-RaycastVolume::RaycastVolume() : aspectRatios(1), scaleFactor(vec3(1)), stepScale(1), enableDiffuseShading(true)
+RaycastVolume::RaycastVolume() : aspectRatios(1), scaleFactor(vec3(1)), stepScale(1)
 {
     // positions shader
-    positionsShader = gl::GlslProg::create(gl::GlslProg::Format()
+    positionsProg = gl::GlslProg::create(gl::GlslProg::Format()
         .vertex(loadAsset("shaders/positions.vert"))
         .fragment(loadAsset("shaders/positions.frag")));
     // raycast shader
     raycastShaderRendertargets = gl::GlslProg::create(gl::GlslProg::Format()
         .vertex(loadAsset("shaders/raycast.vert"))
         .fragment(loadAsset("shaders/raycast_rendertargets.frag")));
-    raycastShaderDirect = gl::GlslProg::create(gl::GlslProg::Format()
-        .vertex(loadAsset("shaders/raycast.vert"))
-        .fragment(loadAsset("shaders/raycast.frag")));
     // histogram calculation 
     histogramCompute = gl::GlslProg::create(gl::GlslProg::Format()
         .compute(loadAsset("shaders/histogram.comp")));
@@ -47,7 +45,7 @@ vec3 RaycastVolume::centerPoint() const
     return vec3(0.5) * scaleFactor;
 }
 
-const float &RaycastVolume::getStepScale() const
+const float& RaycastVolume::getStepScale() const
 {
     return stepScale;
 }
@@ -57,7 +55,7 @@ void RaycastVolume::setStepScale(const float& value)
     stepScale = max(value, 0.1f);
 }
 
-const vec3 &RaycastVolume::getAspectRatios() const
+const vec3& RaycastVolume::getAspectRatios() const
 {
     return aspectRatios;
 }
@@ -182,7 +180,7 @@ void RaycastVolume::loadFromFile(const vec3& dimensions, const vec3& ratios, con
 
 void RaycastVolume::drawCubeFaces() const
 {
-    gl::enableDepth(true);
+    gl::ScopedDepth depth(true);
     // draw front face
     {
         gl::ScopedFramebuffer scopedFramebuffer(frontFbo);
@@ -190,9 +188,9 @@ void RaycastVolume::drawCubeFaces() const
         gl::ScopedFaceCulling faceCulling(true, GL_BACK);
         // draw front face cube positions to render target 
         gl::clear();
-        positionsShader->bind();
-        positionsShader->uniform("scaleFactor", scaleFactor);
-        positionsShader->uniform("renderingFront", true);
+        positionsProg->bind();
+        positionsProg->uniform("scaleFactor", scaleFactor);
+        positionsProg->uniform("renderingFront", true);
         gl::setDefaultShaderVars();
         gl::drawElements(gl::toGl(cubeMesh->getPrimitive()), cubeMesh->getNumIndices(),
                          GL_UNSIGNED_INT, static_cast<GLuint *>(nullptr));
@@ -209,7 +207,7 @@ void RaycastVolume::drawCubeFaces() const
     }
 }
 
-void RaycastVolume::drawVolume(const Camera& camera, bool toRendertargets)
+void RaycastVolume::writeRendertargets(const Camera& camera)
 {
     if (!isDrawable) return;
 
@@ -228,7 +226,7 @@ void RaycastVolume::drawVolume(const Camera& camera, bool toRendertargets)
         drawCubeFaces();
 
         // ray cast cube
-        auto program = toRendertargets ? raycastShaderRendertargets : raycastShaderDirect;
+        auto program = raycastShaderRendertargets;
         gl::ScopedGlslProg scopedProg(program);
         gl::ScopedBlend blend(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         gl::ScopedDepthTest depthRead(false);
@@ -246,54 +244,98 @@ void RaycastVolume::drawVolume(const Camera& camera, bool toRendertargets)
         gl::ScopedTextureBind styleTex(transferFunction->getStyleFunctionTexture(), 8);
 
         // raycast parameters
-        program->uniform("threshold", transferFunction->getThreshold());
+        program->uniform("threshold", vec2(transferFunction->getThreshold()) / 255.0f);
         program->uniform("scaleFactor", scaleFactor);
         program->uniform("stepSize", stepSize * stepScale);
         program->uniform("stepScale", stepScale);
         program->uniform("iterations", static_cast<int>(maxSize * (1.0f / stepScale) * 2.0f));
 
         // lighting
-        program->uniform("diffuseShading", enableDiffuseShading);
+        program->uniform("raycastShadows", RenderingParams::ShadowsEnabled());
+        program->uniform("diffuseShading", RenderingParams::DiffuseShadingEnabled());
         program->uniform("light.direction", light.direction);
         program->uniform("light.ambient", light.ambient);
         program->uniform("light.diffuse", light.diffuse);
         gl::setDefaultShaderVars();
 
-        if (toRendertargets)
+        // draw volume to render targets
         {
             const gl::ScopedFramebuffer scopedFramebuffer(volumeRBuffer);
             {
-                const static GLenum buffers[] = {
-                    GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1,
+                const static GLenum buffers[] =
+                {
+                    GL_COLOR_ATTACHMENT0,
+                    GL_COLOR_ATTACHMENT1,
+                    GL_COLOR_ATTACHMENT2
                 };
-                gl::drawBuffers(2, buffers);
+                gl::drawBuffers(3, buffers);
             }
             const gl::ScopedViewport scopedViewport(ivec2(0), volumeRBuffer->getSize());
             gl::clear();
+
             // draw cube
             gl::drawElements(gl::toGl(cubeMesh->getPrimitive()), cubeMesh->getNumIndices(),
                              GL_UNSIGNED_INT, static_cast<GLuint *>(nullptr));
         }
+    }
+    // post-process
+    {
+        // shadow mapping
+        if (RenderingParams::ShadowsEnabled())
+        {
+            // invert the shadow color map so shadower areas are black
+            {
+                PostProcess::instance().inverse(volumeShadows);
+            }
+            // blur to avoid aliasing
+            {
+                PostProcess::instance().blurHorizontal();
+                PostProcess::instance().blurVertical();
+            }
+            // final shadowing
+            {
+                PostProcess::instance().multiply(volumeColor);
+            }
+            
+            // do tonemapping with resulting postprocess's texture
+            PostProcess::instance().toneMapping();
+        }
+        else // tonemapping with volume's texture
+        {
+            PostProcess::instance().toneMapping(volumeColor);
+        }
+
+        // anti aliasing
+        if (RenderingParams::FXAAEnabled())
+        {
+            PostProcess::instance().displayFXAA();
+        }
         else
         {
-            const gl::ScopedViewport scopedViewport(ivec2(0), toPixels(getWindowSize()));
-            program->uniform("gamma", RenderingParams::GetGamma());
-            program->uniform("exposure", RenderingParams::GetExposure());
-            gl::clear();
-            // draw cube
-            gl::drawElements(gl::toGl(cubeMesh->getPrimitive()), cubeMesh->getNumIndices(),
-                             GL_UNSIGNED_INT, static_cast<GLuint *>(nullptr));
+            PostProcess::instance().displayTexture();
         }
     }
 }
 
 void RaycastVolume::resizeFbos()
 {
+    gl::Texture2d::Format hdrFormat = gl::Texture2d::Format().internalFormat(GL_RGBA16F)
+                                                             .magFilter(GL_NEAREST)
+                                                             .minFilter(GL_NEAREST)
+                                                             .wrap(GL_REPEAT)
+                                                             .dataType(GL_FLOAT);
     gl::Texture2d::Format dataFormat = gl::Texture2d::Format().internalFormat(GL_RGB16F)
                                                               .magFilter(GL_NEAREST)
                                                               .minFilter(GL_NEAREST)
                                                               .wrap(GL_REPEAT)
                                                               .dataType(GL_FLOAT);
+    gl::Texture2d::Format sFormat = gl::Texture2d::Format().internalFormat(GL_R8)
+                                                           .magFilter(GL_LINEAR)
+                                                           .minFilter(GL_LINEAR)
+                                                           .wrap(GL_REPEAT)
+                                                           .dataType(GL_UNSIGNED_BYTE)
+                                                           .swizzleMask(GL_RED, GL_RED, GL_RED, GL_RED);
+
     const ivec2 winSize = getWindowSize();
     const int32_t h = winSize.y;
     const int32_t w = winSize.x;
@@ -304,8 +346,9 @@ void RaycastVolume::resizeFbos()
         gl::Fbo::Format frontFormat, backFormat;
         frontTexture = gl::Texture2d::create(w, h, dataFormat);
         backTexture = gl::Texture2d::create(w, h, dataFormat);
-        volumeColor = gl::Texture2d::create(w, h, dataFormat);
+        volumeColor = gl::Texture2d::create(w, h, hdrFormat);
         volumeNormal = gl::Texture2d::create(w, h, dataFormat);
+        volumeShadows = gl::Texture2d::create(w, h, sFormat);
 
         // front fbo
         frontFormat.attachment(GL_COLOR_ATTACHMENT0, frontTexture);
@@ -317,10 +360,11 @@ void RaycastVolume::resizeFbos()
         backFormat.depthBuffer();
         backFbo = gl::Fbo::create(w, h, backFormat);
 
-        // deferred rendering mode gbuffer
+        // raycast rendering rendertargets
         gl::Fbo::Format gBufferFormat;
         gBufferFormat.attachment(GL_COLOR_ATTACHMENT0, volumeColor);
         gBufferFormat.attachment(GL_COLOR_ATTACHMENT1, volumeNormal);
+        gBufferFormat.attachment(GL_COLOR_ATTACHMENT2, volumeShadows);
         gBufferFormat.depthTexture();
         volumeRBuffer = gl::Fbo::create(w, h, gBufferFormat);
     }
@@ -394,7 +438,7 @@ void RaycastVolume::generateGradients()
     }
 }
 
-const std::array<float, 256> &RaycastVolume::getHistogram() const
+const std::array<float, 256>& RaycastVolume::getHistogram() const
 {
     return histogram;
 }
@@ -404,11 +448,6 @@ void RaycastVolume::setTransferFunction(const std::shared_ptr<StyleTransferFunct
     this->transferFunction = transferFunction;
 }
 
-void RaycastVolume::diffuseShading(bool enable)
-{
-    this->enableDiffuseShading = enable;
-}
-
 void RaycastVolume::setLight(vec3 direction, vec3 ambient, vec3 diffuse)
 {
     light.direction = direction;
@@ -416,27 +455,27 @@ void RaycastVolume::setLight(vec3 direction, vec3 ambient, vec3 diffuse)
     light.diffuse = diffuse;
 }
 
-const Light &RaycastVolume::getLight() const { return light; }
+const Light& RaycastVolume::getLight() const { return light; }
 
-const quat &RaycastVolume::getRotation() const { return modelRotation; }
+const quat& RaycastVolume::getRotation() const { return modelRotation; }
 
 void RaycastVolume::setRotation(const quat& rotation) { modelRotation = rotation; }
 
-const vec3 &RaycastVolume::getPosition() const { return modelPosition; }
+const vec3& RaycastVolume::getPosition() const { return modelPosition; }
 
 void RaycastVolume::setPosition(const vec3& position) { modelPosition = position; }
 
-const gl::Texture2dRef &RaycastVolume::getColorTexture() const
+const gl::Texture2dRef& RaycastVolume::getColorTexture() const
 {
     return volumeColor;
 }
 
-const gl::Texture2dRef &RaycastVolume::getNormalTexture() const
+const gl::Texture2dRef& RaycastVolume::getNormalTexture() const
 {
     return volumeNormal;
 }
 
-const gl::Texture2dRef &RaycastVolume::getDepthTexture() const
+const gl::Texture2dRef& RaycastVolume::getDepthTexture() const
 {
     return volumeRBuffer->getDepthTexture();
 }

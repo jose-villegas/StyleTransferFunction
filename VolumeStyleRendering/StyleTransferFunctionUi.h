@@ -2,12 +2,12 @@
 #include "StyleTransferFunction.h"
 class RaycastVolume;
 
-class TransferFunctionUi
+class StyleTransferFunctionUi
 {
 public:
     void drawUi(bool& open, const RaycastVolume& volume);
-    TransferFunctionUi();
-    ~TransferFunctionUi();
+    StyleTransferFunctionUi();
+    ~StyleTransferFunctionUi();
 
     const std::shared_ptr<StyleTransferFunction> &getTranferFunction() const;
 private:
