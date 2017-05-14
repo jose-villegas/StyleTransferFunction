@@ -15,15 +15,20 @@ layout(binding=5) uniform sampler1D colorMappingFunction;
 layout(binding=6) uniform sampler1D transferFunction;
 layout(binding=7) uniform isampler1D indexFunction;
 layout(binding=8) uniform sampler2DArray styleFunction;
+layout(binding=9) uniform sampler2D volumeAO;
 
+uniform mat4 ciModelView;
+uniform mat3 ciNormalMatrix;
 uniform mat3 ciModelMatrixInverseTranspose;
 uniform Light light;
 
 uniform vec2 threshold;
 uniform vec3 stepSize;
+uniform vec3 shadowStepSize;
 uniform int iterations;
 uniform bool diffuseShading;
 uniform bool raycastShadows;
+uniform bool ambientOcclusion;
 uniform float stepScale;
 
 in vec4 position;
@@ -31,11 +36,12 @@ in vec4 position;
 layout (location=0) out vec4 oColor;
 layout (location=1) out vec3 oNormal;
 layout (location=2) out float oShadow;
+layout (location=3) out vec3 oPosition;
 
 // Spheremap Transform for normal encoding. Used in Cry Engine 3, presented by 
 // Martin Mittring in "A bit more Deferred", p. 13
 // http://www.crytek.com/sites/default/files/A_bit_more_deferred_-_CryEngine3.ppt
-vec3 decode (vec2 enc)
+vec3 decode(vec2 enc)
 {
     vec3 n;
     n.z = dot(enc, enc) * 2.0 - 1.0;
@@ -43,7 +49,7 @@ vec3 decode (vec2 enc)
     return n;
 }
 
-vec2 litsphere (vec3 eye, vec3 normal) 
+vec2 litsphere(vec3 eye, vec3 normal) 
 {
     vec3 reflected = reflect(eye, normal);
 
@@ -57,7 +63,7 @@ vec2 litsphere (vec3 eye, vec3 normal)
     return reflected.xy / m + 0.5;
 }
 
-vec4 styleMapping (vec3 eye, vec3 normal, float opacity)
+vec4 styleMapping(vec3 eye, vec3 normal, float opacity)
 {
     // apply litsphere
     float index = texture(transferFunction, opacity).x;
@@ -84,7 +90,7 @@ vec4 styleMapping (vec3 eye, vec3 normal, float opacity)
 
 float voxelOcclusion(vec3 rayStart, vec3 rayDir)
 {
-    vec3 step = rayDir * 2.0f * stepSize;
+    vec3 step = rayDir * shadowStepSize;
     vec3 pos = rayStart + step;
 
     for(int i = 0; i < iterations; i++)
@@ -139,6 +145,7 @@ void main(void)
 
         if(value.a >= threshold.x && value.a <= threshold.y)
         {
+            float aOcclusion = 1.0;
             // assigned color from transfer function for this density
             src = texture(colorMappingFunction, value.a);
 
@@ -152,12 +159,23 @@ void main(void)
             // opacity correction
             src.a = 1 - pow((1 - src.a), stepScale / 0.5);
 
+            if(ambientOcclusion) 
+            {
+                aOcclusion = texelFetch(volumeAO, ivec2(gl_FragCoord.xy), 0).x;
+            }
+
             if(diffuseShading)
             {
                 // diffuse shading + fake ambient light
                 vec3 lightDir = normalize(-light.direction);
                 float lambert = max(dot(normal, lightDir), 0.0);
-                src.rgb = light.diffuse * lambert * src.rgb + light.ambient * src.rgb;
+                vec3 diffuse = light.diffuse * lambert * src.rgb;
+                vec3 ambient = light.ambient * src.rgb;
+                src.rgb = aOcclusion * ambient + diffuse;
+            }
+            else 
+            {
+                src.rgb *= aOcclusion;
             }
 
             // front to back blending
@@ -178,11 +196,13 @@ void main(void)
 
     if(raycastShadows)
     {
+        // use world direction in this case since raycast is done in world space
         vec3 lightDir = normalize(-light.direction);
         oShadow = voxelOcclusion(pos, -lightDir) * 0.5;
     }
 
     oColor = dst;
-    oNormal = value.xyz;
-    gl_FragDepth = pos.z;
+    // store normal and position in view-space
+    oNormal = ciNormalMatrix * value.xyz;
+    oPosition = (ciModelView * vec4(pos, 1.0)).xyz;
 }

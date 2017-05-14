@@ -1,6 +1,9 @@
+#include <CinderImGui.h>
+#include <cinder/ip/Resize.h>
+
 #include "TransferFunction.h"
 #include "RaycastVolume.h"
-#include "CinderImGui.h"
+
 using namespace glm;
 using namespace cinder;
 
@@ -237,6 +240,20 @@ void TransferFunction::setColorPointIsoValue(const int index, const int isoValue
     bool needSorting = !is_sorted(colorPoints.begin(), colorPoints.end());
 
     if (needSorting) { sort(colorPoints.begin(), colorPoints.end()); }
+
+    updateFunction();
+}
+
+void TransferFunction::reset()
+{
+    colorPoints.clear();
+    alphaPoints.clear();
+
+    colorPoints.push_back(TransferFunctionColorPoint(vec3(1), 0));
+    colorPoints.push_back(TransferFunctionColorPoint(vec3(1), 255));
+
+    alphaPoints.push_back(TransferFunctionAlphaPoint(1.0, 0));
+    alphaPoints.push_back(TransferFunctionAlphaPoint(1.0, 255));
 
     updateFunction();
 }

@@ -239,6 +239,12 @@ const gl::Texture3dRef &StyleTransferFunction::getStyleFunctionTexture()
     return styleFunctionTexture;
 }
 
+void StyleTransferFunction::reset()
+{
+    stylePoints.clear();
+    TransferFunction::reset();
+}
+
 const Style &Style::GetDefaultStyle()
 {
     if (styles.empty())

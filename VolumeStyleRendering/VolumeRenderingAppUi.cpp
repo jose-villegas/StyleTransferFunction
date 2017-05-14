@@ -1,8 +1,10 @@
+#include <CinderImGui.h>
+
 #include "VolumeRenderingAppUi.h"
 #include "RaycastVolume.h"
-#include "CinderImGui.h"
 #include "StyleTransferFunctionUi.h"
 #include "RenderingParams.h"
+
 using namespace glm;
 
 bool VolumeRenderingAppUi::loadNewVolume = false;
@@ -49,20 +51,29 @@ void VolumeRenderingAppUi::DrawUi(RaycastVolume& volume)
 
 void VolumeRenderingAppUi::DrawRenderingOptions(RaycastVolume& volume)
 {
+    static bool showFps = true;
+
     if (showRendering)
     {
         ui::Begin("Rendering", &showRendering, ImGuiWindowFlags_AlwaysAutoResize);
         static float stepScale = volume.getStepScale();
+        static float sStepScale = volume.getShadowStepScale();
         static vec3 aspectRatios = volume.getAspectRatios();
         static int renderingPath = 0;
         static float exposure = RenderingParams::GetExposure();
         static float gamma = RenderingParams::GetGamma();
+
         stepScale = volume.getStepScale();
         aspectRatios = volume.getAspectRatios();
 
         if (ui::SliderFloat("Step Scale", &stepScale, 0.1, 8))
         {
             volume.setStepScale(stepScale);
+        }
+
+        if (ui::SliderFloat("Shadow Step Scale", &sStepScale, 0.2, 16))
+        {
+            volume.setShadowStepScale(sStepScale);
         }
 
         if (ui::InputFloat3("Aspect", value_ptr(aspectRatios)))
@@ -79,6 +90,8 @@ void VolumeRenderingAppUi::DrawRenderingOptions(RaycastVolume& volume)
         {
             RenderingParams::SetExposure(exposure);
         }
+        
+        ui::Checkbox("Show FPS", &showFps);
 
         ui::Separator();
         ui::Text("Post-effects");
@@ -95,6 +108,46 @@ void VolumeRenderingAppUi::DrawRenderingOptions(RaycastVolume& volume)
             ui::TreePop();
         }
 
+        if (ui::TreeNode("SSAO"))
+        {
+            static bool ssao = RenderingParams::SSAOEnabled();
+            static float ssaoRadius = RenderingParams::SSAORadius();;
+            static float ssaoBias = RenderingParams::SSAOBias();;
+            static float ssaoPower = RenderingParams::SSAOPower();;
+
+            if (ui::Checkbox("Enable", &ssao))
+            {
+                RenderingParams::SSAOEnabled(ssao);
+            }
+
+            if(ui::SliderFloat("Radius", &ssaoRadius, 0.001f, 8.0f))
+            {
+                RenderingParams::SSAORadius(ssaoRadius);
+            }
+
+            if (ui::SliderFloat("Bias", &ssaoBias, 0.0f, 0.5f))
+            {
+                RenderingParams::SSAOBias(ssaoBias);
+            }
+
+            if (ui::SliderFloat("Power", &ssaoPower, 0.0f, 32.0f))
+            {
+                RenderingParams::SSAOPower(ssaoPower);
+            }
+
+            ui::TreePop();
+        }
+
+        ui::End();
+    }
+
+    if (showFps)
+    {
+        static ImVec2 rectSize;
+        ui::SetNextWindowPos(ImVec2(ci::app::getWindowWidth() - rectSize.x * 1.55, ci::app::getWindowHeight() - rectSize.y * 2.25));
+        ui::Begin("##FPS", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
+        ui::Text("Framerate: (%.1f)", ui::GetIO().Framerate);
+        rectSize = ui::GetItemRectSize();
         ui::End();
     }
 }
@@ -194,6 +247,8 @@ bool VolumeRenderingAppUi::VolumeLoadPopup(RaycastVolume& volume)
 
 void VolumeRenderingAppUi::DrawMainMenuBar(RaycastVolume& volume)
 {
+    static bool showFps = true;
+
     // menu bar on top
     {
         ui::ScopedMainMenuBar menuBar;

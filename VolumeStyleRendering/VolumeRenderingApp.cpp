@@ -1,12 +1,11 @@
-#include "cinder/app/App.h"
-#include "cinder/app/RendererGl.h"
-#include "cinder/gl/gl.h"
+#include <cinder/app/App.h>
+#include <cinder/app/RendererGl.h>
+#include <cinder/gl/gl.h>
+#include <CinderImGui.h>
 
-#include "CinderImGui.h"
 #include "RaycastVolume.h"
 #include "PostProcess.h"
 #include "VolumeRenderingAppUi.h"
-#include "RenderingParams.h"
 
 using namespace ci;
 using namespace app;
@@ -55,7 +54,7 @@ void VolumeRenderingApp::draw()
     // volume raycasting
     {
         volume.setPosition(-volume.centerPoint());
-        volume.writeRendertargets(camera);
+        volume.drawVolume(camera);
     }
 }
 

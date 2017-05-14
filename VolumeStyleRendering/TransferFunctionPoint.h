@@ -1,5 +1,5 @@
 #pragma once
-#include "cinder/gl/gl.h"
+#include <cinder/CinderMath.h>
 
 class TransferFunctionPoint
 {

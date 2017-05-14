@@ -1,7 +1,9 @@
+#include <CinderImGui.h>
+#include <cinder/ip/Resize.h>
+
 #include "StyleTransferFunctionUi.h"
 #include "RaycastVolume.h"
-#include "CinderImGui.h"
-#include "cinder/ip/Resize.h"
+
 using namespace glm;
 using namespace ci;
 
@@ -56,14 +58,93 @@ void StyleTransferFunctionUi::drawUi(bool& open, const RaycastVolume& volume)
     }
 }
 
+JsonTree StyleTransferFunctionUi::buildTransferFunctionJSON() const
+{
+    JsonTree functionJson;
+    functionJson.addChild(JsonTree("threshold", "")
+        .addChild(JsonTree("x", transferFunction->getThreshold().x))
+        .addChild(JsonTree("y", transferFunction->getThreshold().y)));
+
+    auto jAlphaP = JsonTree::makeArray("alpha_points");
+
+    for (auto& p : transferFunction->getAlphaPoints())
+    {
+        JsonTree aPoint;
+        aPoint.addChild(JsonTree("iso_value", p.getIsoValue()))
+              .addChild(JsonTree("alpha", p.getAlpha()));
+        jAlphaP.addChild(aPoint);
+    }
+
+    functionJson.addChild(jAlphaP);
+    auto jColorP = JsonTree::makeArray("color_points");
+
+    for (auto& p : transferFunction->getColorPoints())
+    {
+        auto& color = p.getColor();
+        JsonTree cPoint;
+        cPoint.addChild(JsonTree("iso_value", p.getIsoValue()));
+        cPoint.addChild(JsonTree::makeArray("color")
+            .addChild(JsonTree("", color.x))
+            .addChild(JsonTree("", color.y))
+            .addChild(JsonTree("", color.z)));
+        jColorP.addChild(cPoint);
+    }
+
+    functionJson.addChild(jColorP);
+    auto jStyleP = JsonTree::makeArray("style_points");
+
+    for (auto& p : transferFunction->getStylePoints())
+    {
+        JsonTree sPoint;
+        sPoint.addChild(JsonTree("iso_value", p.getIsoValue()))
+              .addChild(JsonTree("style", ""))
+              .addChild(JsonTree("path", p.getStyle().getFilepath()))
+              .addChild(JsonTree("name", p.getStyle().getName()));
+        jStyleP.addChild(sPoint);
+    }
+
+    functionJson.addChild(jStyleP);
+
+    return functionJson;
+}
+
+void StyleTransferFunctionUi::loadTransferFunctionJSON(const JsonTree& second) const
+{
+    transferFunction->setThreshold(second["threshold"]["x"].getValue<int>(),
+                                   second["threshold"]["y"].getValue<int>());
+
+    // clear the transfer function control points
+    transferFunction->reset();
+
+    for (auto& aP : second["alpha_points"].getChildren())
+    {
+        transferFunction->addAlphaPoint(aP["alpha"].getValue<float>(), aP["iso_value"].getValue<int>());
+    }
+
+    for (auto& cP : second["color_points"].getChildren())
+    {
+        vec3 color;
+        int i = 0;
+
+        for (auto& c : cP["color"].getChildren())
+        {
+            color[i++] = c.getValue<float>();
+        }
+
+        transferFunction->addColorPoint(color, cP["iso_value"].getValue<int>());
+    }
+}
+
 StyleTransferFunctionUi::StyleTransferFunctionUi()
 {
     transferFunction = std::make_shared<StyleTransferFunction>();
+    // build initial data for json tree
+    buildTransferFunctionJSON();
 }
 
 StyleTransferFunctionUi::~StyleTransferFunctionUi() {}
 
-const std::shared_ptr<StyleTransferFunction> &StyleTransferFunctionUi::getTranferFunction() const
+const std::shared_ptr<StyleTransferFunction>& StyleTransferFunctionUi::getTranferFunction() const
 {
     return transferFunction;
 }
@@ -410,7 +491,50 @@ void StyleTransferFunctionUi::drawControlPointList(int pointType) const
     }
 }
 
-void StyleTransferFunctionUi::drawControlPointCreationUi() const
+void StyleTransferFunctionUi::drawTransferFunctionsManager(bool& showTFManager)
+{
+    if (showTFManager)
+    {
+        ui::Begin("Transfer Functions", &showTFManager, ImGuiWindowFlags_AlwaysAutoResize);
+        ui::BeginChild("##functions", ImVec2(250, 300), true);
+        int selectedIndex = 0;
+        int selectedId = 0;
+        int removeIndex = -1;
+
+        for (auto& f : savedTransferFunctions)
+        {
+            ui::PushID(&f);
+            ui::BeginGroup();
+            ui::InputText("##name", &f.first);
+            ui::SameLine();
+
+            if (ui::RadioButton("##select", &selectedIndex, selectedId++))
+            {
+                loadTransferFunctionJSON(f.second);
+            }
+
+            if (ui::Button("X")) { removeIndex = selectedId - 1; }
+
+            ui::EndGroup();
+            ui::PopID();
+        }
+
+        ui::EndChild();
+
+        if (ui::Button("Save", ImVec2(71, 0)))
+        {
+            savedTransferFunctions.push_back({"New Function", buildTransferFunctionJSON()});
+        }
+
+        ui::SameLine();
+        ui::Button("Load", ImVec2(71, 0));
+        ui::End();
+
+        if (removeIndex >= 0) { savedTransferFunctions.erase(savedTransferFunctions.begin() + removeIndex); }
+    }
+}
+
+void StyleTransferFunctionUi::drawControlPointCreationUi()
 {
     // creation bar
     static int pointType = 0;
@@ -418,6 +542,7 @@ void StyleTransferFunctionUi::drawControlPointCreationUi() const
     static float alpha;
     static vec3 color;
     static bool showStylesManager = false;
+    static bool showTFManager = false;
     static StylePoint stylePoint;
 
     ui::BeginGroup();
@@ -464,7 +589,6 @@ void StyleTransferFunctionUi::drawControlPointCreationUi() const
     }
 
     ui::EndGroup();
-    ImVec2 size = ui::GetItemRectSize();
     ui::SameLine();
     ui::BeginGroup();
 
@@ -475,7 +599,7 @@ void StyleTransferFunctionUi::drawControlPointCreationUi() const
         ui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(vec4(0.5f)));
     }
 
-    if (ui::Button("Add Point", ImVec2(ui::GetContentRegionAvailWidth(), size.y / 2)))
+    if (ui::Button("Add Point", ImVec2(ui::GetContentRegionAvailWidth(), 0)))
     {
         pointType == 0 ? transferFunction->addAlphaPoint(alpha, isoValue)
             : pointType == 1 ? transferFunction->addColorPoint(color, isoValue) : 0;
@@ -485,9 +609,14 @@ void StyleTransferFunctionUi::drawControlPointCreationUi() const
 
     if (pointType == 2 && stylePoint.getStyleIndex() < 0) { ui::PopStyleColor(3); }
 
-    if (ui::Button("Styles Manager", ImVec2(ui::GetContentRegionAvailWidth(), size.y / 2)))
+    if (ui::Button("Styles Manager", ImVec2(ui::GetContentRegionAvailWidth(), 0)))
     {
         showStylesManager = true;
+    }
+
+    if (ui::Button("Functions Manager", ImVec2(ui::GetContentRegionAvailWidth(), 0)))
+    {
+        showTFManager = !showTFManager;
     }
 
     if (showStylesManager)
@@ -501,4 +630,5 @@ void StyleTransferFunctionUi::drawControlPointCreationUi() const
 
     ui::EndGroup();
     drawControlPointList(pointType);
+    drawTransferFunctionsManager(showTFManager);
 }

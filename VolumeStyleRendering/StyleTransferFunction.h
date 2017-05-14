@@ -1,5 +1,5 @@
 #pragma once
-#include "cinder/gl/gl.h"
+#include <cinder/gl/gl.h>
 #include "TransferFunction.h"
 
 class Style
@@ -60,6 +60,7 @@ public:
     const ci::gl::Texture1dRef &getTransferFunctionTexture();
     const ci::gl::Texture1dRef &getIndexFunctionTexture();
     const ci::gl::Texture3dRef &getStyleFunctionTexture();
+    void reset() override;
 private:
     std::vector<StylePoint> stylePoints;
     std::vector<glm::vec2> transferFunction;

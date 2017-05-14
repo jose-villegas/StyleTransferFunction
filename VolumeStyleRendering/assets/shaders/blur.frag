@@ -1,7 +1,7 @@
 #version 420
 layout(binding=0) uniform sampler2D source;
 
-uniform int blurQuality;
+uniform int blurIntensity;
 uniform vec2 blurDirection;
 
 in vec2 uvs;
@@ -47,11 +47,11 @@ vec4 blur9() {
 
 void main()
 {
-	if(blurQuality == 1) 
+	if(blurIntensity == 1) 
 		oColor = blur5();
-	else if(blurQuality == 2) 
+	else if(blurIntensity == 2) 
 		oColor = blur9();
-	else if(blurQuality == 3) 
+	else if(blurIntensity == 3) 
 		oColor = blur13();
 	else 
 		oColor = blur5();

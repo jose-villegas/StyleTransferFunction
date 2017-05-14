@@ -1,5 +1,5 @@
 #pragma once
-#include "cinder/CinderGlm.h"
+#include <cinder/CinderGlm.h>
 #include <vector>
 
 class CubicSpline

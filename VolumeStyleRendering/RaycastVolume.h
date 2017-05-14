@@ -1,5 +1,5 @@
 #pragma once
-#include "cinder/gl/gl.h"
+#include <cinder/gl/gl.h>
 #include "Light.h"
 
 class StyleTransferFunction;
@@ -24,7 +24,7 @@ public:
      * \param toRendertargets If true it renders the raycasting result to color, normal and depth render targets
      */
 
-    void writeRendertargets(const cinder::Camera& camera);
+    void drawVolume(const cinder::Camera& camera);
     /**
      * \brief Updates frame buffer objects to the current size of the main window
      */
@@ -49,6 +49,16 @@ public:
      * \param value The new step scale
      */
     void setStepScale(const float& value);
+    /**
+    * \brief Raycasting's step scale for the occlusion check ray
+    * \return The step scale of the raycasting ray
+    */
+    const float &getShadowStepScale() const;
+    /**
+    * \brief Sets the volume raycasting's ray step scale for the occlusion check ray
+    * \param value The new step scale
+    */
+    void setShadowStepScale(const float& value);
     /**
      * \brief Volume's aspect ratios per axis
      * \return Volume's aspect ratios
@@ -135,6 +145,7 @@ private:
     ci::gl::FboRef frontFbo;
     ci::gl::FboRef backFbo;
     ci::gl::FboRef volumeRBuffer;
+    ci::gl::FboRef volumeAOFbo;
 
     // volume raycast
     ci::gl::GlslProgRef raycastShaderRendertargets;
@@ -157,6 +168,8 @@ private:
     ci::gl::Texture2dRef volumeNormal;
     ci::gl::Texture2dRef volumeColor;
     ci::gl::Texture2dRef volumeShadows;
+    ci::gl::Texture2dRef volumePosition;
+    ci::gl::Texture2dRef volumeAO;
 
     // raycast parameters
     ci::gl::Texture2dRef noiseTexture;
@@ -165,6 +178,7 @@ private:
     glm::vec3 aspectRatios;
     glm::vec3 scaleFactor;
     float stepScale;
+    float shadowStepScale;
     float maxSize;
 
     // model

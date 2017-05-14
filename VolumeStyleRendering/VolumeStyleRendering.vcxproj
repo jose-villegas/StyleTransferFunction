@@ -176,16 +176,20 @@
     <ClInclude Include="RaycastVolume.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="assets\shaders\average.frag" />
     <None Include="assets\shaders\blur.frag" />
     <None Include="assets\shaders\fs_quad.vert" />
     <None Include="assets\shaders\fxaa.frag" />
     <None Include="assets\shaders\gradients.comp" />
     <None Include="assets\shaders\histogram.comp" />
+    <None Include="assets\shaders\inverse.frag" />
+    <None Include="assets\shaders\multiply.frag" />
     <None Include="assets\shaders\positions.frag" />
     <None Include="assets\shaders\positions.vert" />
     <None Include="assets\shaders\raycast.vert" />
     <None Include="assets\shaders\raycast_rendertargets.frag" />
     <None Include="assets\shaders\smooth_gradients.comp" />
+    <None Include="assets\shaders\ssao.frag" />
     <None Include="assets\shaders\tonemapping.frag" />
     <None Include="shaders\fs_quad.vert" />
     <None Include="shaders\fxaa.frag" />

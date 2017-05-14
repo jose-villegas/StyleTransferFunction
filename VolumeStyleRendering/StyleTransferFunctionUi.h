@@ -1,5 +1,8 @@
 #pragma once
+#include <cinder/Json.h>
+
 #include "StyleTransferFunction.h"
+
 class RaycastVolume;
 
 class StyleTransferFunctionUi
@@ -11,8 +14,11 @@ public:
 
     const std::shared_ptr<StyleTransferFunction> &getTranferFunction() const;
 private:
+    std::vector<std::pair<std::string, ci::JsonTree>> savedTransferFunctions;
     std::shared_ptr<StyleTransferFunction> transferFunction;
     void drawHistogram(const RaycastVolume& volume) const;
+    ci::JsonTree buildTransferFunctionJSON() const;
+    void loadTransferFunctionJSON(const cinder::JsonTree& second) const;
 
     int stylesManagerPopup() const;
     void drawThresholdControl() const;
@@ -22,5 +28,6 @@ private:
     void drawColorPointList() const;
     void drawStylePointList() const;
     void drawControlPointList(int pointType) const;
-    void drawControlPointCreationUi() const;
+    void drawTransferFunctionsManager(bool& showTFManager);
+    void drawControlPointCreationUi();
 };

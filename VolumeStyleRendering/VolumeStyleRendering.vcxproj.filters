@@ -113,6 +113,10 @@
     <None Include="assets\shaders\smooth_gradients.comp" />
     <None Include="assets\shaders\tonemapping.frag" />
     <None Include="assets\shaders\blur.frag" />
+    <None Include="assets\shaders\ssao.frag" />
+    <None Include="assets\shaders\multiply.frag" />
+    <None Include="assets\shaders\inverse.frag" />
+    <None Include="assets\shaders\average.frag" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="images\noise.png">

@@ -1,6 +1,9 @@
 #pragma once
+#include <cinder/gl/gl.h>
+
 #include "TransferFunctionPoint.h"
 #include "CubicSpline.h"
+
 class RaycastVolume;
 
 class TransferFunction
@@ -20,6 +23,7 @@ public:
     void setAlphaPointIsoValue(const int index, const int isoValue);
     void setColorPointIsoValue(const int index, const int isoValue);
     void setThreshold(int minIso, int maxIso);
+    virtual void reset();
     const glm::ivec2 &getThreshold() const;
     const std::vector<TransferFunctionColorPoint> &getColorPoints() const;
     const std::vector<TransferFunctionAlphaPoint> &getAlphaPoints() const;

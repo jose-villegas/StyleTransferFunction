@@ -1,14 +1,16 @@
-#include "RaycastVolume.h"
 #include <cinder/app/AppBase.h>
 #include <cinder/Log.h>
-#include "StyleTransferFunctionUi.h"
+
+#include "RaycastVolume.h"
+#include "StyleTransferFunction.h"
 #include "RenderingParams.h"
 #include "PostProcess.h"
+
 using namespace ci;
 using namespace glm;
 using namespace app;
 
-RaycastVolume::RaycastVolume() : aspectRatios(1), scaleFactor(vec3(1)), stepScale(1)
+RaycastVolume::RaycastVolume() : aspectRatios(1), scaleFactor(vec3(1)), stepScale(1), shadowStepScale(3)
 {
     // positions shader
     positionsProg = gl::GlslProg::create(gl::GlslProg::Format()
@@ -53,6 +55,16 @@ const float& RaycastVolume::getStepScale() const
 void RaycastVolume::setStepScale(const float& value)
 {
     stepScale = max(value, 0.1f);
+}
+
+const float& RaycastVolume::getShadowStepScale() const
+{
+    return shadowStepScale;
+}
+
+void RaycastVolume::setShadowStepScale(const float& value)
+{
+    shadowStepScale = max(value, 0.5f);
 }
 
 const vec3& RaycastVolume::getAspectRatios() const
@@ -189,7 +201,6 @@ void RaycastVolume::drawCubeFaces() const
         // draw front face cube positions to render target 
         gl::clear();
         positionsProg->bind();
-        positionsProg->uniform("scaleFactor", scaleFactor);
         positionsProg->uniform("renderingFront", true);
         gl::setDefaultShaderVars();
         gl::drawElements(gl::toGl(cubeMesh->getPrimitive()), cubeMesh->getNumIndices(),
@@ -207,7 +218,7 @@ void RaycastVolume::drawCubeFaces() const
     }
 }
 
-void RaycastVolume::writeRendertargets(const Camera& camera)
+void RaycastVolume::drawVolume(const Camera& camera)
 {
     if (!isDrawable) return;
 
@@ -221,6 +232,7 @@ void RaycastVolume::writeRendertargets(const Camera& camera)
         gl::setMatrices(camera);
         gl::rotate(modelRotation);
         gl::translate(modelPosition);
+        gl::scale(scaleFactor);
 
         // draw cube positions
         drawCubeFaces();
@@ -229,8 +241,7 @@ void RaycastVolume::writeRendertargets(const Camera& camera)
         auto program = raycastShaderRendertargets;
         gl::ScopedGlslProg scopedProg(program);
         gl::ScopedBlend blend(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        gl::ScopedDepthTest depthRead(false);
-        gl::ScopedDepthWrite depthWrite(true);
+        gl::ScopedDepth depth(false);
 
         // bind  textures
         gl::ScopedTextureBind frontTex(frontTexture, 0);
@@ -242,17 +253,19 @@ void RaycastVolume::writeRendertargets(const Camera& camera)
         gl::ScopedTextureBind transferTex(transferFunction->getTransferFunctionTexture(), 6);
         gl::ScopedTextureBind indexTex(transferFunction->getIndexFunctionTexture(), 7);
         gl::ScopedTextureBind styleTex(transferFunction->getStyleFunctionTexture(), 8);
+        gl::ScopedTextureBind ambientOcclusionTex(volumeAO, 9);
 
         // raycast parameters
         program->uniform("threshold", vec2(transferFunction->getThreshold()) / 255.0f);
-        program->uniform("scaleFactor", scaleFactor);
         program->uniform("stepSize", stepSize * stepScale);
+        program->uniform("shadowStepSize", stepSize * shadowStepScale);
         program->uniform("stepScale", stepScale);
         program->uniform("iterations", static_cast<int>(maxSize * (1.0f / stepScale) * 2.0f));
 
         // lighting
         program->uniform("raycastShadows", RenderingParams::ShadowsEnabled());
         program->uniform("diffuseShading", RenderingParams::DiffuseShadingEnabled());
+        program->uniform("ambientOcclusion", RenderingParams::SSAOEnabled());
         program->uniform("light.direction", light.direction);
         program->uniform("light.ambient", light.ambient);
         program->uniform("light.diffuse", light.diffuse);
@@ -266,9 +279,10 @@ void RaycastVolume::writeRendertargets(const Camera& camera)
                 {
                     GL_COLOR_ATTACHMENT0,
                     GL_COLOR_ATTACHMENT1,
-                    GL_COLOR_ATTACHMENT2
+                    GL_COLOR_ATTACHMENT2,
+                    GL_COLOR_ATTACHMENT3
                 };
-                gl::drawBuffers(3, buffers);
+                gl::drawBuffers(4, buffers);
             }
             const gl::ScopedViewport scopedViewport(ivec2(0), volumeRBuffer->getSize());
             gl::clear();
@@ -280,6 +294,25 @@ void RaycastVolume::writeRendertargets(const Camera& camera)
     }
     // post-process
     {
+        // ambient occlusion
+        {
+            PostProcess::instance().SSAO(volumePosition, volumeNormal, camera);
+            // write blurred result
+            {
+                const gl::ScopedViewport scopedViewport(ivec2(0), volumeAOFbo->getSize());
+                const gl::ScopedMatrices matrices;
+                const gl::ScopedDepth depth(false);
+                const gl::ScopedFramebuffer scopedFramebuffer(volumeAOFbo);
+
+                // translate to center and scale to fit whole screen
+                gl::translate(getWindowCenter());
+                gl::scale(getWindowSize());
+
+                // gaussian filter
+                PostProcess::instance().average(nullptr, false);
+            }
+        }
+
         // shadow mapping
         if (RenderingParams::ShadowsEnabled())
         {
@@ -349,6 +382,8 @@ void RaycastVolume::resizeFbos()
         volumeColor = gl::Texture2d::create(w, h, hdrFormat);
         volumeNormal = gl::Texture2d::create(w, h, dataFormat);
         volumeShadows = gl::Texture2d::create(w, h, sFormat);
+        volumePosition = gl::Texture2d::create(w, h, dataFormat);
+        volumeAO = gl::Texture2d::create(w, h, sFormat);
 
         // front fbo
         frontFormat.attachment(GL_COLOR_ATTACHMENT0, frontTexture);
@@ -365,8 +400,15 @@ void RaycastVolume::resizeFbos()
         gBufferFormat.attachment(GL_COLOR_ATTACHMENT0, volumeColor);
         gBufferFormat.attachment(GL_COLOR_ATTACHMENT1, volumeNormal);
         gBufferFormat.attachment(GL_COLOR_ATTACHMENT2, volumeShadows);
-        gBufferFormat.depthTexture();
+        gBufferFormat.attachment(GL_COLOR_ATTACHMENT3, volumePosition);
+        gBufferFormat.depthBuffer();
         volumeRBuffer = gl::Fbo::create(w, h, gBufferFormat);
+
+        // ambient occlusion
+        gl::Fbo::Format aoFormat;
+        aoFormat.attachment(GL_COLOR_ATTACHMENT0, volumeAO);
+        aoFormat.depthBuffer();
+        volumeAOFbo = gl::Fbo::create(w, h, aoFormat);
     }
     catch (const Exception& e)
     {

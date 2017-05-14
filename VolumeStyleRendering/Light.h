@@ -1,5 +1,5 @@
 #pragma once
-#include "cinder/CinderMath.h"
+#include <cinder/CinderMath.h>
 
 class Light
 {

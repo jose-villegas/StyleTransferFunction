@@ -1,7 +1,10 @@
-#include "PostProcess.h"
 #include <cinder/app/AppBase.h>
 #include <cinder/Log.h>
+#include <random>
+
+#include "PostProcess.h"
 #include "RenderingParams.h"
+
 using namespace ci;
 using namespace glm;
 using namespace app;
@@ -59,7 +62,7 @@ void PostProcess::toneMapping(const gl::Texture2dRef& hdrBuffer, bool local) con
     if (local) End();
 }
 
-void PostProcess::blurHorizontal(const gl::Texture2dRef& texture, bool local) const
+void PostProcess::blurHorizontal(int blurType, const gl::Texture2dRef& texture, bool local) const
 {
     if (local) Start();
 
@@ -68,6 +71,7 @@ void PostProcess::blurHorizontal(const gl::Texture2dRef& texture, bool local) co
     // custom uniforms
     auto& prog = blurRect->getGlslProg();
     prog->uniform("blurDirection", vec2(1.0f / static_cast<float>(currentFbo->getSize().x), 0.0f));
+    prog->uniform("blurType", blurType);
 
     // first pass blur
     blurRect->draw();
@@ -75,7 +79,7 @@ void PostProcess::blurHorizontal(const gl::Texture2dRef& texture, bool local) co
     if (local) End();
 }
 
-void PostProcess::blurVertical(const gl::Texture2dRef& texture, bool local) const
+void PostProcess::blurVertical(int blurType, const gl::Texture2dRef& texture, bool local) const
 {
     if (local) Start();
 
@@ -84,6 +88,7 @@ void PostProcess::blurVertical(const gl::Texture2dRef& texture, bool local) cons
     // custom uniforms
     auto& prog = blurRect->getGlslProg();
     prog->uniform("blurDirection", vec2(0.0f, 1.0f / static_cast<float>(currentFbo->getSize().y)));
+    prog->uniform("blurType", blurType);
 
     // first pass blur
     blurRect->draw();
@@ -91,7 +96,7 @@ void PostProcess::blurVertical(const gl::Texture2dRef& texture, bool local) cons
     if (local) End();
 }
 
-void PostProcess::inverse(const gl::Texture2dRef& texture, bool local ) const
+void PostProcess::inverse(const gl::Texture2dRef& texture, bool local) const
 {
     if (local) Start();
 
@@ -112,6 +117,51 @@ void PostProcess::multiply(const gl::Texture2dRef& texture0, const gl::Texture2d
 
     // draw quad with mapped texture
     multiplyRect->draw();
+
+    if (local) End();
+}
+
+void PostProcess::average(const gl::Texture2dRef& texture, bool local) const
+{
+    if (local) Start();
+
+    auto& tex = texture ? texture : getColorTexture();
+    const gl::ScopedTextureBind scopedTextureBind0(tex, 0);
+
+    // custom uniforms
+    auto& prog = averageRect->getGlslProg();
+    prog->uniform("texelSize", 1.0f / static_cast<vec2>(tex->getSize()));
+
+    // draw quad with mapped texture
+    averageRect->draw();
+
+    if (local) End();
+}
+
+void PostProcess::SSAO(const gl::Texture2dRef& position, const gl::Texture2dRef& normal, const Camera& camera, bool local)
+{
+    if (local) Start();
+
+    const gl::ScopedTextureBind scopedTextureBind0(normal, 0);
+    const gl::ScopedTextureBind scopedTextureBind1(position, 1);
+    const gl::ScopedTextureBind scopedTextureBind2(ssaoNoiseTexture, 2);
+
+    // custom uniforms
+    auto& prog = ssaoRect->getGlslProg();
+    prog->uniform("projectionMatrix", camera.getProjectionMatrix());
+    prog->uniform("radius", RenderingParams::SSAORadius());
+    prog->uniform("bias", RenderingParams::SSAOBias());
+    prog->uniform("power", RenderingParams::SSAOPower());
+
+    for (int i = 0; i < ssaoKernel.size(); i++)
+    {
+        prog->uniform("ssaoKernel[" + std::to_string(i) + "]", ssaoKernel[i]);
+    }
+
+    gl::setDefaultShaderVars();
+
+    // draw quad with mapped texture
+    ssaoRect->draw();
 
     if (local) End();
 }
@@ -151,7 +201,7 @@ const gl::Texture2dRef& PostProcess::getColorTexture() const
 void PostProcess::resizeFbos()
 {
     // temporal accumulated texture
-    gl::Texture2d::Format colorAccFormat = gl::Texture2d::Format().internalFormat(GL_RGBA16F)
+    gl::Texture2d::Format colorAccFormat = gl::Texture2d::Format().internalFormat(GL_RGB16F)
                                                                   .magFilter(GL_NEAREST)
                                                                   .minFilter(GL_NEAREST)
                                                                   .wrap(GL_REPEAT);
@@ -214,6 +264,12 @@ PostProcess::PostProcess()
     auto multiplyProg = gl::GlslProg::create(gl::GlslProg::Format()
         .vertex(loadAsset("shaders/fs_quad.vert"))
         .fragment(loadAsset("shaders/multiply.frag")));
+    auto ssaoProg = gl::GlslProg::create(gl::GlslProg::Format()
+        .vertex(loadAsset("shaders/fs_quad.vert"))
+        .fragment(loadAsset("shaders/ssao.frag")));
+    auto averageProg = gl::GlslProg::create(gl::GlslProg::Format()
+        .vertex(loadAsset("shaders/fs_quad.vert"))
+        .fragment(loadAsset("shaders/average.frag")));
     // create fs quad for single texture display
     const gl::GlslProgRef stockTexture = gl::context()->getStockShader(gl::ShaderDef().texture(GL_TEXTURE_2D));
     const gl::VboMeshRef rect = gl::VboMesh::create(geom::Rect());
@@ -223,6 +279,50 @@ PostProcess::PostProcess()
     blurRect = gl::Batch::create(rect, blurProg);
     inverseRect = gl::Batch::create(rect, inverseProg);
     multiplyRect = gl::Batch::create(rect, multiplyProg);
+    ssaoRect = gl::Batch::create(rect, ssaoProg);
+    averageRect = gl::Batch::create(rect, averageProg);
     // sets targets
     currentFbo = colorFbo;
+
+    // SSAO setup
+    std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0); // random floats between 0.0 - 1.0
+    std::default_random_engine generator;
+
+    // Create random sampling kernel
+    for (GLuint i = 0; i < 64; ++i)
+    {
+        vec3 sample
+        (
+            randomFloats(generator) * 2.0 - 1.0,
+            randomFloats(generator) * 2.0 - 1.0,
+            randomFloats(generator)
+        );
+        sample = glm::normalize(sample);
+        sample *= randomFloats(generator);
+        GLfloat scale = GLfloat(i) / 64.0;
+        scale = lerp(0.1f, 1.0f, scale * scale);
+        sample *= scale;
+        ssaoKernel.push_back(sample);
+    }
+
+    // Random kernel rotations
+    std::vector<vec3> ssaoNoise;
+    for (GLuint i = 0; i < 16; i++)
+    {
+        vec3 noise
+        (
+            randomFloats(generator) * 2.0 - 1.0,
+            randomFloats(generator) * 2.0 - 1.0,
+            0.0f
+        );
+        ssaoNoise.push_back(noise);
+    }
+
+    auto noiseFormat = gl::Texture2d::Format()
+            .magFilter(GL_NEAREST)
+            .minFilter(GL_NEAREST)
+            .wrap(GL_REPEAT)
+            .internalFormat(GL_RGB);
+    noiseFormat.dataType(GL_FLOAT);
+    ssaoNoiseTexture = gl::Texture2d::create(ssaoNoise.data(), GL_RGB, 4, 4, noiseFormat);
 }
