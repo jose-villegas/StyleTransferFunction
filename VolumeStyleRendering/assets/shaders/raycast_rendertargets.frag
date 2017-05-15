@@ -153,7 +153,7 @@ void main(void)
             vec3 wsNormal = normalize(ciModelMatrixInverseTranspose * value.xyz);
 
             // style transfer, view space calculation
-            vec3 eye = normalize((ciModelView * vec4(pos, 1.0)).xyz;
+            vec3 eye = normalize((ciModelView * vec4(pos, 1.0))).xyz;
             vec3 vsNormal = normalize(ciNormalMatrix * value.xyz);
             src *= styleMapping(eye, vsNormal, value.a);
 
