@@ -27,13 +27,24 @@ void StylePoint::setStyle(unsigned int index)
     styleIndex = clamp(static_cast<int>(index), 0, static_cast<int>(Style::GetAvailableStyles().size()) - 1);
 }
 
-void Style::AddStyle(const Style& style)
+void Style::AddStyle(const std::string& name, const std::string& filepath)
 {
     // max number of styles
     if (styles.size() > 127) { return; }
 
     // check if filepath has been already loaded
-    for (auto& s : styles) { if (s.filepath == style.filepath) return; }
+    for (auto& s : styles) { if (s.filepath == filepath) return; }
+
+    // resize image to fit within 2d array of textures
+    Surface baseImage = loadImage(filepath);
+    Surface resizedImage(512, 512, true, SurfaceChannelOrder::RGBA);
+    ip::resize(baseImage, &resizedImage);
+    auto texture = gl::Texture2d::create(resizedImage, gl::Texture2d::Format()
+                                         .wrap(GL_CLAMP_TO_BORDER)
+                                         .minFilter(GL_LINEAR)
+                                         .magFilter(GL_LINEAR)
+                                         .internalFormat(GL_RGBA8));
+    auto style = Style(name, resizedImage, texture, filepath);
 
     styles.push_back(style);
     styles.back().name = style.name.substr(0, 32);

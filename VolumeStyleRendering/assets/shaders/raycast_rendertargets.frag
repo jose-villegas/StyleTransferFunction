@@ -150,10 +150,12 @@ void main(void)
 
             // gradient value
             value.xyz = decode(texture(gradients, pos).xy);
-            vec3 normal = normalize(ciModelMatrixInverseTranspose * value.xyz);
+            vec3 wsNormal = normalize(ciModelMatrixInverseTranspose * value.xyz);
 
-            // style transfer
-            src *= styleMapping(pos, normal, value.a);
+            // style transfer, view space calculation
+            vec3 eye = normalize((ciModelView * vec4(pos, 1.0)).xyz;
+            vec3 vsNormal = normalize(ciNormalMatrix * value.xyz);
+            src *= styleMapping(eye, vsNormal, value.a);
 
             // opacity correction
             src.a = 1 - pow((1 - src.a), stepScale / 0.5);
@@ -167,7 +169,7 @@ void main(void)
             {
                 // diffuse shading + fake ambient light
                 vec3 lightDir = normalize(-light.direction);
-                float lambert = max(dot(normal, lightDir), 0.0);
+                float lambert = max(dot(wsNormal, lightDir), 0.0);
                 vec3 diffuse = light.diffuse * lambert * src.rgb;
                 vec3 ambient = light.ambient * src.rgb;
                 src.rgb = aOcclusion * ambient + diffuse;

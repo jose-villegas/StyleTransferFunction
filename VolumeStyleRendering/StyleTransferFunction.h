@@ -5,7 +5,7 @@
 class Style
 {
 public:
-    static void AddStyle(const Style& style);
+    static void AddStyle(const std::string &name, const std::string &filepath);
     static void RemoveStyle(const int index);
     static void RenameStyle(const int index, const std::string& name);
     static const std::vector<Style> &GetAvailableStyles();

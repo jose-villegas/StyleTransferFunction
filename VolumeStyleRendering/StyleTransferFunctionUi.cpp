@@ -173,10 +173,7 @@ void StyleTransferFunctionUi::loadTransferFunctionJSON(const JsonTree& second) c
 
         if(sourceRef)
         {
-            Surface baseImage = sourceRef;
-            Surface resizedImage(512, 512, true, SurfaceChannelOrder::RGBA);
-            ip::resize(baseImage, &resizedImage);
-            Style::AddStyle(Style(name, resizedImage, gl::Texture2d::create(resizedImage), path));
+            Style::AddStyle(name, path);
 
             for (int i = 0; i < styles.size(); i++)
             {
@@ -289,12 +286,7 @@ int StyleTransferFunctionUi::stylesManagerPopup() const
 
             if (!fsPath.empty())
             {
-                Surface baseImage = loadImage(fsPath);
-                Surface resizedImage(512, 512, true, SurfaceChannelOrder::RGBA);
-                ip::resize(baseImage, &resizedImage);
-
-                Style::AddStyle(Style(fsPath.filename().string(), resizedImage,
-                                      gl::Texture2d::create(resizedImage), fsPath.string()));
+                Style::AddStyle(fsPath.filename().string(), fsPath.string());
             }
         }
 
