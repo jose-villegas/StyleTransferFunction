@@ -53,9 +53,24 @@ void VolumeRenderingAppUi::DrawRenderingOptions(RaycastVolume& volume)
 {
     static bool showFps = true;
 
+    if (showFps)
+    {
+        static ImVec2 rectSize;
+        ui::SetNextWindowPos(ImVec2(ci::app::getWindowWidth() - rectSize.x * 1.55, ci::app::getWindowHeight() - rectSize.y * 2.25));
+        ui::Begin("##FPS", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
+        ui::Text("Framerate: (%.1f)", ui::GetIO().Framerate);
+        rectSize = ui::GetItemRectSize();
+        ui::End();
+    }
+
     if (showRendering)
     {
-        ui::Begin("Rendering", &showRendering, ImGuiWindowFlags_AlwaysAutoResize);
+        if (!ui::Begin("Rendering", &showRendering, ImGuiWindowFlags_AlwaysAutoResize))
+        {
+            ui::End();
+            return;
+        }
+        
         static float stepScale = volume.getStepScale();
         static float sStepScale = volume.getShadowStepScale();
         static vec3 aspectRatios = volume.getAspectRatios();
@@ -140,29 +155,24 @@ void VolumeRenderingAppUi::DrawRenderingOptions(RaycastVolume& volume)
 
         ui::End();
     }
-
-    if (showFps)
-    {
-        static ImVec2 rectSize;
-        ui::SetNextWindowPos(ImVec2(ci::app::getWindowWidth() - rectSize.x * 1.55, ci::app::getWindowHeight() - rectSize.y * 2.25));
-        ui::Begin("##FPS", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
-        ui::Text("Framerate: (%.1f)", ui::GetIO().Framerate);
-        rectSize = ui::GetItemRectSize();
-        ui::End();
-    }
 }
 
 void VolumeRenderingAppUi::DrawLightingSetup(RaycastVolume& volume)
 {
     if (showLightingSetup)
     {
+        if(!ui::Begin("Lighting", &showLightingSetup, ImGuiWindowFlags_AlwaysAutoResize))
+        {
+            ui::End();
+            return;
+        }
+
         static Light light = volume.getLight();
         static float lightIntensity = 1.0f;
         static vec3 rotation;
         static bool doShading = true;
         static bool shadows = true;;
         bool changed = false;
-        ui::Begin("Lighting", &showLightingSetup, ImGuiWindowFlags_AlwaysAutoResize);
 
         if (ui::Checkbox("Enable Diffuse Shading", &doShading))
         {
@@ -194,9 +204,14 @@ void VolumeRenderingAppUi::DrawRotationControls(RaycastVolume& volume)
 {
     if (showRotationControls)
     {
+        if(!ui::Begin("Rotate", &showRotationControls, ImGuiWindowFlags_AlwaysAutoResize))
+        {
+            ui::End();
+            return;
+        }
+
         static vec3 angles = vec3(0);
         bool changed = false;
-        ui::Begin("Rotate", &showRotationControls, ImGuiWindowFlags_AlwaysAutoResize);
         changed |= ui::SliderAngle("X", &angles.x);
         changed |= ui::SliderAngle("Y", &angles.y);
         changed |= ui::SliderAngle("Z", &angles.z);

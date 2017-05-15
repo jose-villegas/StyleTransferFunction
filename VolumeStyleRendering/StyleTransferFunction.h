@@ -39,7 +39,7 @@ public:
     StylePoint(int isoValue, unsigned styleIndex);
     int getStyleIndex() const;
     const Style &getStyle() const;
-    void setStyle(unsigned index);
+    void setStyle(unsigned int index);
 private:
     int styleIndex;
 };

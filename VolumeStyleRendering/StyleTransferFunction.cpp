@@ -13,24 +13,27 @@ StylePoint::StylePoint(int isoValue, unsigned styleIndex): TransferFunctionPoint
 
 int StylePoint::getStyleIndex() const { return styleIndex; }
 
-const Style &StylePoint::getStyle() const
+const Style& StylePoint::getStyle() const
 {
     if (styleIndex < 0 || styleIndex >= Style::GetAvailableStyles().size()) { return Style::GetDefaultStyle(); }
 
     return Style::GetAvailableStyles()[styleIndex];
 }
 
-void StylePoint::setStyle(unsigned index)
+void StylePoint::setStyle(unsigned int index)
 {
     if (Style::GetAvailableStyles().empty()) { styleIndex = -1; }
 
-    styleIndex = min(max(index, 0U), Style::GetAvailableStyles().size());
+    styleIndex = clamp(static_cast<int>(index), 0, static_cast<int>(Style::GetAvailableStyles().size()) - 1);
 }
 
 void Style::AddStyle(const Style& style)
 {
     // max number of styles
     if (styles.size() > 127) { return; }
+
+    // check if filepath has been already loaded
+    for (auto& s : styles) { if (s.filepath == style.filepath) return; }
 
     styles.push_back(style);
     styles.back().name = style.name.substr(0, 32);
@@ -50,7 +53,7 @@ void Style::RenameStyle(const int index, const std::string& name)
     styles[index].name = name.substr(0, 32);
 }
 
-const std::vector<Style> &Style::GetAvailableStyles()
+const std::vector<Style>& Style::GetAvailableStyles()
 {
     if (styles.empty()) { GetDefaultStyle(); }
 
@@ -160,7 +163,7 @@ void StyleTransferFunction::updateFunction()
     textureDataChanged = true;
 }
 
-const std::vector<StylePoint> &StyleTransferFunction::getStylePoints() const
+const std::vector<StylePoint>& StyleTransferFunction::getStylePoints() const
 {
     return stylePoints;
 }
@@ -209,7 +212,7 @@ void StyleTransferFunction::updateTextures()
     textureDataChanged = false;
 }
 
-const gl::Texture1dRef &StyleTransferFunction::getTransferFunctionTexture()
+const gl::Texture1dRef& StyleTransferFunction::getTransferFunctionTexture()
 {
     if (textureDataChanged)
     {
@@ -219,7 +222,7 @@ const gl::Texture1dRef &StyleTransferFunction::getTransferFunctionTexture()
     return transferFunctionTexture;
 }
 
-const gl::Texture1dRef &StyleTransferFunction::getIndexFunctionTexture()
+const gl::Texture1dRef& StyleTransferFunction::getIndexFunctionTexture()
 {
     if (textureDataChanged)
     {
@@ -229,7 +232,7 @@ const gl::Texture1dRef &StyleTransferFunction::getIndexFunctionTexture()
     return indexFunctionTexture;
 }
 
-const gl::Texture3dRef &StyleTransferFunction::getStyleFunctionTexture()
+const gl::Texture3dRef& StyleTransferFunction::getStyleFunctionTexture()
 {
     if (textureDataChanged)
     {
@@ -245,7 +248,7 @@ void StyleTransferFunction::reset()
     TransferFunction::reset();
 }
 
-const Style &Style::GetDefaultStyle()
+const Style& Style::GetDefaultStyle()
 {
     if (styles.empty())
     {
@@ -253,7 +256,7 @@ const Style &Style::GetDefaultStyle()
         Surface resizedImage(512, 512, true, SurfaceChannelOrder::RGBA);
         ip::resize(baseImage, &resizedImage);
         auto texture = gl::Texture2d::create(resizedImage);
-        styles.push_back(Style("Default", resizedImage, texture, "images/noise.png"));
+        styles.push_back(Style("Default", resizedImage, texture, getAssetPath("images/default.png").string()));
 
         return styles.back();
     }

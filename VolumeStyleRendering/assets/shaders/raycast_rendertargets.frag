@@ -103,8 +103,7 @@ float voxelOcclusion(vec3 rayStart, vec3 rayDir)
             vec4 src = texture(colorMappingFunction, opacity);
 
             // voxel is occluded
-            if(src.a >= 0.95) 
-                return 1.0;
+            if(src.a >= 0.2) return 1.0;
         }
 
         pos += step;

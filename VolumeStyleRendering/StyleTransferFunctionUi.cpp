@@ -49,13 +49,20 @@ void StyleTransferFunctionUi::drawUi(bool& open, const RaycastVolume& volume)
 {
     if (open)
     {
-        ui::Begin("Transfer Function", &open, ImGuiWindowFlags_AlwaysAutoResize);
+        if(!ui::Begin("Transfer Function", &open, ImGuiWindowFlags_AlwaysAutoResize))
+        {
+            ui::End();
+            return;
+        }
+
         drawHistogram(volume);
         drawControlPointsUi();
         drawThresholdControl();
         drawControlPointCreationUi();
         ui::End();
     }
+
+    drawTransferFunctionsManager();
 }
 
 JsonTree StyleTransferFunctionUi::buildTransferFunctionJSON() const
@@ -97,9 +104,9 @@ JsonTree StyleTransferFunctionUi::buildTransferFunctionJSON() const
     {
         JsonTree sPoint;
         sPoint.addChild(JsonTree("iso_value", p.getIsoValue()))
-              .addChild(JsonTree("style", ""))
+              .addChild(JsonTree("style", "")
               .addChild(JsonTree("path", p.getStyle().getFilepath()))
-              .addChild(JsonTree("name", p.getStyle().getName()));
+              .addChild(JsonTree("name", p.getStyle().getName())));
         jStyleP.addChild(sPoint);
     }
 
@@ -152,9 +159,41 @@ void StyleTransferFunctionUi::loadTransferFunctionJSON(const JsonTree& second) c
                                        color);
         }
     }
+
+    auto& styles = Style::GetAvailableStyles();
+
+    for (auto& sP : second["style_points"].getChildren())
+    {
+        auto isoVal = sP["iso_value"].getValue<int>();
+        auto name = sP["style"]["name"].getValue();
+        auto path = sP["style"]["path"].getValue();
+        auto styleIndex = -1;
+
+        auto sourceRef = loadImage(path);
+
+        if(sourceRef)
+        {
+            Surface baseImage = sourceRef;
+            Surface resizedImage(512, 512, true, SurfaceChannelOrder::RGBA);
+            ip::resize(baseImage, &resizedImage);
+            Style::AddStyle(Style(name, resizedImage, gl::Texture2d::create(resizedImage), path));
+
+            for (int i = 0; i < styles.size(); i++)
+            {
+                if (styles[i].getFilepath() == path)
+                {
+                    styleIndex = i;
+                    break;
+                }
+            }
+
+            transferFunction->addStylePoint(StylePoint(isoVal, styleIndex));
+        }
+        else { transferFunction->addStylePoint(StylePoint(isoVal, 0)); }
+    }
 }
 
-StyleTransferFunctionUi::StyleTransferFunctionUi()
+StyleTransferFunctionUi::StyleTransferFunctionUi() : showTFManager(false)
 {
     transferFunction = std::make_shared<StyleTransferFunction>();
     // build initial data for json tree
@@ -204,7 +243,7 @@ int StyleTransferFunctionUi::stylesManagerPopup() const
             ui::Dummy(ImVec2(0, 4));
             ui::BeginGroup();
             ui::Indent(4);
-            ui::Image((void *)(intptr_t)style.getTexture()->getId(), ImVec2(64, 64));
+            ui::Image(style.getTexture(), ImVec2(64, 64));
 
             if (ui::IsItemHovered())
             {
@@ -303,7 +342,7 @@ void StyleTransferFunctionUi::drawControlPointsUi() const
         drawList->AddCircleFilled(ImVec2(p.x + step * colorP.getIsoValue() + 4.0f, y + sz), 5, col32, 24);
         drawList->AddCircle(ImVec2(p.x + step * colorP.getIsoValue() + 4.0f, y + sz), 5, invCol32, 24);
     }
-
+    
     for (auto& styleP : stylePoints)
     {
         const auto img = (void*)(intptr_t)styleP.getStyle().getTexture()->getId();
@@ -438,7 +477,7 @@ void StyleTransferFunctionUi::drawStylePointList() const
         auto style = styleP.getStyle();
 
         ui::PushID(&styleP);
-        ui::Image((void *)(intptr_t)style.getTexture()->getId(), ImVec2(height, height));
+        ui::Image(style.getTexture(), ImVec2(height, height));
         ui::SameLine();
         ui::PushItemWidth(ui::GetContentRegionAvailWidth() * 0.4f - 32);
 
@@ -510,13 +549,18 @@ void StyleTransferFunctionUi::drawControlPointList(int pointType) const
     }
 }
 
-void StyleTransferFunctionUi::drawTransferFunctionsManager(bool& showTFManager)
+void StyleTransferFunctionUi::drawTransferFunctionsManager()
 {
     if (showTFManager)
     {
-        ui::Begin("Transfer Functions", &showTFManager, ImGuiWindowFlags_AlwaysAutoResize);
+        if(!ui::Begin("Transfer Functions", &showTFManager, ImGuiWindowFlags_AlwaysAutoResize))
+        {
+            ui::End();
+            return;
+        }
+
         ui::BeginChild("##functions", ImVec2(250, 300), true);
-        int selectedIndex = 0;
+        static int selectedIndex = 0;
         int selectedId = 0;
         int removeIndex = -1;
 
@@ -573,6 +617,7 @@ void StyleTransferFunctionUi::drawTransferFunctionsManager(bool& showTFManager)
             {
                 savedTransferFunctions.push_back({fsPath.filename().string(), JsonTree(loadFile(fsPath))});
                 loadTransferFunctionJSON(savedTransferFunctions.back().second);
+                selectedIndex = savedTransferFunctions.size() - 1;
             }
         }
 
@@ -590,7 +635,6 @@ void StyleTransferFunctionUi::drawControlPointCreationUi()
     static float alpha;
     static vec3 color;
     static bool showStylesManager = false;
-    static bool showTFManager = false;
     static StylePoint stylePoint;
 
     ui::BeginGroup();
@@ -622,7 +666,7 @@ void StyleTransferFunctionUi::drawControlPointCreationUi()
         {
             stylePoint.setIsoValue(isoValue);
             auto& style = stylePoint.getStyle();
-            ui::Image((void *)(intptr_t)style.getTexture()->getId(), ImVec2(sliderSize.y, sliderSize.y));
+            ui::Image(style.getTexture(), ImVec2(sliderSize.y, sliderSize.y));
             ui::SameLine();
 
             if (ui::Button(style.getName().c_str(), ImVec2(sliderSize.x - sliderSize.y - 2, sliderSize.y)))
@@ -678,5 +722,4 @@ void StyleTransferFunctionUi::drawControlPointCreationUi()
 
     ui::EndGroup();
     drawControlPointList(pointType);
-    drawTransferFunctionsManager(showTFManager);
 }

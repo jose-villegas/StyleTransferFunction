@@ -16,6 +16,7 @@ public:
 private:
     std::vector<std::pair<std::string, ci::JsonTree>> savedTransferFunctions;
     std::shared_ptr<StyleTransferFunction> transferFunction;
+    bool showTFManager;
     void drawHistogram(const RaycastVolume& volume) const;
     ci::JsonTree buildTransferFunctionJSON() const;
     void loadTransferFunctionJSON(const cinder::JsonTree& second) const;
@@ -28,6 +29,6 @@ private:
     void drawColorPointList() const;
     void drawStylePointList() const;
     void drawControlPointList(int pointType) const;
-    void drawTransferFunctionsManager(bool& showTFManager);
+    void drawTransferFunctionsManager();
     void drawControlPointCreationUi();
 };
