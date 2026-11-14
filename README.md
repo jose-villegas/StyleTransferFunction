@@ -7,17 +7,25 @@ kept in step with the transfer function.
 
 Made with **C++20**, **OpenGL 4.3**, [Cinder](https://libcinder.org) and [Dear ImGui](https://github.com/ocornut/imgui).
 
-![Classic and volumetric lighting while the light circles the skull](screenshots/lighting.gif)
+![Classic and volumetric lighting while the light circles the bonsai](screenshots/lighting.gif)
 
-| Bonsai | Foot | Skull |
+| Bonsai | Skull | Foot |
 |---|---|---|
-| ![Bonsai](screenshots/bonsai.png) | ![Foot](screenshots/foot.png) | ![Skull](screenshots/skull.png) |
+| ![Bonsai](screenshots/bonsai.png) | ![Skull](screenshots/skull.png) | ![Foot](screenshots/foot.png) |
+
+| Aneurysm | Engine |
+|---|---|
+| ![Aneurysm](screenshots/aneurism.png) | ![Engine](screenshots/engine.png) |
 
 ## Features
 
 - **Style transfer functions.** Alpha, color and style control points on one editor over the volume's histogram.
   Styles are lit sphere images; any image can be added from the *Styles Manager*. Functions save to and load from
-  `.stf` files.
+  `.stf` files. The bundled styles (bone, skin, foliage, wood, soil, ceramic, vessel, steel and brass) are painted by
+  `tools/make_styles.py`.
+- **Style lookahead.** The edge of a dense material passes through the densities of thinner ones, so its rim takes
+  their style. The style can be looked up a few voxels behind the boundary instead, set in the *Rendering* window.
+- **Crop box** in the *Rendering* window, to cut away parts of a volume that share densities with the subject.
 - **Ray casting** of 8 and 16 bit raw volumes with jittered start positions, opacity correction for the step size,
   early ray termination and per axis aspect ratios.
 - **Gradients** from central differences, smoothed by a separable 5×5×5 binomial filter in compute shaders. Their
@@ -96,7 +104,7 @@ project.
 *File → Open* loads a raw volume: give its dimensions, aspect ratio and bit depth. The *Volume* menu opens the
 transfer function, lighting, rendering and rotation windows. Drag to orbit, scroll to zoom.
 
-Three 256³ volumes are in `volumes/`. A command line harness loads them with a tuned transfer function, and also
+Five volumes are in `volumes/`. A command line harness loads them with a tuned transfer function, and also
 drives captures and smoke tests. Without arguments the app starts empty as before.
 
 ```bash
@@ -105,12 +113,13 @@ cd VolumeStyleRendering && ../x64/Release/VolumeStyleRendering.exe --preset skul
 
 | Option | Effect |
 |---|---|
-| `--preset bonsai\|skull\|foot` | load a bundled volume with its transfer function and framing |
+| `--preset bonsai\|skull\|foot\|aneurism\|engine` | load a bundled volume with its transfer function and framing |
 | `--volume <raw> --dims X,Y,Z` | load any raw volume, with `--16bit` and `--aspect X,Y,Z` |
 | `--lighting classic\|volumetric` | lighting model |
 | `--off shadows\|occlusion\|indirect\|specular\|gradient` | turn one volumetric term off, repeatable |
 | `--light RX,RY,RZ`, `--intensity I`, `--ambient A` | light rotation in degrees, intensity, ambient strength |
 | `--rotate RX,RY,RZ`, `--threshold MIN,MAX` | volume rotation, iso value range |
+| `--crop X,Y,Z,X,Y,Z` | crop box minimum and maximum, 0 to 1 per axis |
 | `--camera YAW,PITCH,DISTANCE` | orbit camera position |
 | `--size W,H`, `--ui`, `--no-ui` | window size, open the tool windows, hide every window |
 | `--frames N`, `--warmup N`, `--capture <dir>` | render N frames after warm up, save each as a png, then quit |
@@ -123,6 +132,9 @@ From the [Open SciVis Datasets](https://klacansky.com/open-scivis-datasets/) col
 - Bonsai: CT scan of a bonsai tree, S. Roettger, VIS, University of Stuttgart.
 - Foot: rotational C-arm x-ray scan of a human foot, Philips Research, Hamburg, Germany.
 - Skull: rotational C-arm x-ray scan of a phantom of a human skull, Siemens Medical Solutions, Forchheim, Germany.
+- Aneurysm: rotational C-arm x-ray scan of the arteries of the right half of a human head, with a contrast agent
+  and an aneurysm, Philips Research, Hamburg, Germany.
+- Engine: CT scan of two cylinders of an engine block, General Electric, USA.
 
 ## Reference
 

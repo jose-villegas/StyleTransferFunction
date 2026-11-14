@@ -9,7 +9,8 @@ class RaycastVolume;
  * \brief Opt-in command line driver for screenshots, GIF frames and smoke tests.
  * Without arguments the app behaves as an interactive editor and none of this runs.
  *
- *   --preset bonsai|skull|foot     load a bundled volume with a tuned transfer function
+ *   --preset NAME                  load a bundled volume with a tuned transfer function:
+ *                                  bonsai, skull, foot, aneurism or engine
  *   --volume <raw> --dims X,Y,Z    load any raw volume, --16bit, --aspect X,Y,Z
  *   --lighting classic|volumetric  lighting model
  *   --off shadows|occlusion|indirect|specular|gradient   turn one volumetric term off, repeatable
@@ -18,6 +19,7 @@ class RaycastVolume;
  *   --ambient A                    volumetric ambient strength
  *   --rotate RX,RY,RZ              volume rotation in degrees
  *   --threshold MIN,MAX            transfer function iso value range
+ *   --crop X,Y,Z,X,Y,Z             crop box, minimum and maximum in 0-1 texture coordinates
  *   --camera YAW,PITCH,DISTANCE    orbit camera around the volume, degrees
  *   --size W,H                     window size
  *   --ui | --no-ui                 open the tool windows, or hide every window
@@ -80,6 +82,9 @@ private:
     int debugView = 0;
     glm::vec3 rotation{0};
     bool hasRotation = false;
+    glm::vec3 cropMin{0};
+    glm::vec3 cropMax{1};
+    bool hasCrop = false;
     glm::ivec2 threshold{0};
     float intensity = 1.0f;
 

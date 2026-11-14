@@ -30,6 +30,11 @@ uniform vec3 stepSize;
 uniform vec3 shadowStepSize;
 uniform int iterations;
 uniform float stepScale;
+// samples outside the crop box are skipped
+uniform vec3 cropMin;
+uniform vec3 cropMax;
+// style lookup distance behind a boundary, in texture coordinates
+uniform vec3 styleLookahead;
 
 // classic lighting: lambert + ambient, screen space shadows and ssao
 uniform bool diffuseShading;
@@ -71,8 +76,10 @@ vec2 litsphere(vec3 eye, vec3 normal)
     return reflected.xy / m + 0.5;
 }
 
-vec4 styleMapping(vec3 eye, vec3 normal, float opacity)
+// lit sphere color for this density, styled is 1 when a style applies and 0 otherwise
+vec4 styleMapping(vec3 eye, vec3 normal, float opacity, out float styled)
 {
+    styled = 0.0;
     // apply litsphere
     float index = texture(transferFunction, opacity).x;
 
@@ -93,7 +100,10 @@ vec4 styleMapping(vec3 eye, vec3 normal, float opacity)
     vec4 style1 = texture(styleFunction, vec3(litsphere(eye, normal), styleIndex1));
 
     // interpolate
-    return styleIndex0 < 0 ? style1 : styleIndex1 < 0 ? style0 : mix(style0, style1, weight);
+    vec4 style = styleIndex0 < 0 ? style1 : styleIndex1 < 0 ? style0 : mix(style0, style1, weight);
+    styled = 1.0;
+    // style images are sRGB, lighting and tone mapping work in linear color
+    return vec4(pow(style.rgb, vec3(2.2)), style.a);
 }
 
 float voxelOcclusion(vec3 rayStart, vec3 rayDir)
@@ -125,7 +135,7 @@ float voxelOcclusion(vec3 rayStart, vec3 rayDir)
 }
 
 // direct light, ambient occlusion and indirect light for one sample, world space
-vec3 volumetricShading(vec3 albedo, vec3 pos, vec4 gradient)
+vec3 volumetricShading(vec3 albedo, vec3 pos, vec4 gradient, float styled)
 {
     vec3 toLight = normalize(-light.direction);
     vec3 worldPos = (ciModelMatrix * vec4(pos, 1.0)).xyz;
@@ -135,7 +145,8 @@ vec3 volumetricShading(vec3 albedo, vec3 pos, vec4 gradient)
     // fades from a surface (lambert + specular) to a scattering medium as the
     // gradient magnitude drops, where the normal is noise
     float magnitude = gradient.w;
-    float surface = gradientShading * smoothstep(0.005, 0.06, magnitude);
+    // a lit sphere already holds the surface's directional shading and highlight
+    float surface = gradientShading * smoothstep(0.005, 0.06, magnitude) * (1.0 - styled);
     vec3 normal = normalize(ciModelMatrixInverseTranspose * -gradient.xyz / max(magnitude, 1e-5));
 
     float lambert = max(dot(normal, toLight), 0.0);
@@ -183,7 +194,9 @@ void main(void)
     {
         value.a = texture(volume, pos).x;
 
-        if(value.a >= threshold.x && value.a <= threshold.y)
+        bool cropped = any(lessThan(pos, cropMin)) || any(greaterThan(pos, cropMax));
+
+        if(!cropped && value.a >= threshold.x && value.a <= threshold.y)
         {
             float aOcclusion = 1.0;
             // assigned color from transfer function for this density
@@ -196,16 +209,26 @@ void main(void)
             vec3 wsNormal = normalize(ciModelMatrixInverseTranspose * value.xyz);
 
             // style transfer, view space calculation
-            vec3 eye = normalize((ciModelView * vec4(pos, 1.0))).xyz;
+            vec3 eye = normalize((ciModelView * vec4(pos, 1.0)).xyz);
             vec3 vsNormal = normalize(ciNormalMatrix * value.xyz);
-            src *= styleMapping(eye, vsNormal, value.a);
+            // the style comes from the densest material just behind the boundary, the edge of a
+            // dense object passes through the densities of thinner ones
+            float styleDensity = value.a;
+
+            if(any(greaterThan(styleLookahead, vec3(0.0))))
+            {
+                styleDensity = max(styleDensity, texture(volume, pos - value.xyz * styleLookahead).x);
+            }
+
+            float styled;
+            src *= styleMapping(eye, vsNormal, styleDensity, styled);
 
             // opacity correction
             src.a = 1 - pow((1 - src.a), stepScale / 0.5);
 
             if(volumetricLighting)
             {
-                src.rgb = volumetricShading(src.rgb, pos, gradient);
+                src.rgb = volumetricShading(src.rgb, pos, gradient, styled);
             }
             else
             {
@@ -218,7 +241,8 @@ void main(void)
                 {
                     // diffuse shading + fake ambient light
                     vec3 lightDir = normalize(-light.direction);
-                    float lambert = max(dot(wsNormal, lightDir), 0.0);
+                    // styled samples take their directional shading from the lit sphere
+                    float lambert = mix(max(dot(wsNormal, lightDir), 0.0), 1.0, styled);
                     vec3 diffuse = light.diffuse * lambert * src.rgb;
                     vec3 ambient = light.ambient * src.rgb;
                     src.rgb = aOcclusion * ambient + diffuse;

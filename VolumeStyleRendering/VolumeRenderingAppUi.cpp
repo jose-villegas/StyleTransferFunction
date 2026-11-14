@@ -117,6 +117,10 @@ void VolumeRenderingAppUi::DrawRenderingOptions(RaycastVolume& volume)
             volume.setShadowStepScale(sStepScale);
         }
 
+        ui::SliderFloat3("Crop Min", value_ptr(volume.cropMin), 0.0f, 1.0f);
+        ui::SliderFloat3("Crop Max", value_ptr(volume.cropMax), 0.0f, 1.0f);
+        ui::SliderFloat("Style Lookahead", &volume.styleLookahead, 0.0f, 4.0f);
+
         if (ui::InputFloat3("Aspect", value_ptr(aspectRatios)))
         {
             volume.setAspectratios(aspectRatios);

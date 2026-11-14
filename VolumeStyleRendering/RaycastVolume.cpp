@@ -277,6 +277,9 @@ void RaycastVolume::drawVolume(const Camera& camera)
         program->uniform("shadowStepSize", stepSize * shadowStepScale);
         program->uniform("stepScale", stepScale);
         program->uniform("iterations", static_cast<int>(maxSize * (1.0f / stepScale) * 2.0f));
+        program->uniform("cropMin", cropMin);
+        program->uniform("cropMax", cropMax);
+        program->uniform("styleLookahead", styleLookahead * stepSize);
 
         // lighting
         program->uniform("raycastShadows", RenderingParams::ShadowsEnabled());

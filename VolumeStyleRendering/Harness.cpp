@@ -12,6 +12,7 @@
 #include "RaycastVolume.h"
 #include "RenderingParams.h"
 #include "StyleTransferFunction.h"
+#include "StyleTransferFunctionUi.h"
 #include "VolumeRenderingAppUi.h"
 
 using namespace ci;
@@ -133,12 +134,25 @@ void Harness::parse(const std::vector<std::string>& args)
         else if (arg == "--intensity" && hasValue) intensity = std::stof(value);
         else if (arg == "--threshold" && hasValue) threshold = parseVector<int, 2>(value);
         else if (arg == "--rotate" && hasValue) { rotation = parseVector<float, 3>(value); hasRotation = true; }
+        else if (arg == "--crop" && hasValue)
+        {
+            const auto box = value.find(',', value.find(',', value.find(',') + 1) + 1);
+            cropMin = parseVector<float, 3>(value.substr(0, box));
+            cropMax = parseVector<float, 3>(value.substr(box + 1));
+            hasCrop = true;
+        }
         else
         {
             consumed = false;
 
             if (arg == "--16bit") is16Bits = true;
-            else if (arg == "--ui") openUi = true;
+            else if (arg == "--ui")
+            {
+                openUi = true;
+                // show the style points, the heart of a style transfer function
+                StyleTransferFunctionUi::PointType = 2;
+                StyleTransferFunctionUi::OpenPointList = true;
+            }
             else if (arg == "--no-ui") noUi = true;
             else continue;
         }
@@ -157,21 +171,51 @@ void Harness::applyPreset(RaycastVolume& volume)
 
     if (preset.empty() || !transferFunction) return;
 
+    // colors stay white, the lit sphere styles give each material its color and shading
     transferFunction->reset();
 
     if (preset == "bonsai")
     {
-        // leaves, trunk and pot, the transfer function of the original screenshots
-        transferFunction->setThreshold(29, 255);
-        transferFunction->addAlphaPoint(0.0f, 45);
-        transferFunction->addAlphaPoint(0.85f, 63);
-        transferFunction->addAlphaPoint(0.0f, 80);
-        transferFunction->addColorPoint(vec3(191, 235, 86) / 255.0f, 24);
-        transferFunction->addColorPoint(vec3(173, 97, 25) / 255.0f, 45);
-        transferFunction->addColorPoint(vec3(255, 191, 155) / 255.0f, 187);
-        transferFunction->addStylePoint(StylePoint(36, addStyle("foliage")));
-        transferFunction->addStylePoint(StylePoint(63, addStyle("bark")));
-        transferFunction->addStylePoint(StylePoint(160, addStyle("porcelain")));
+        // green leaves, wood, soil and a glazed ceramic pot
+        transferFunction->setThreshold(40, 255);
+        transferFunction->setAlpha(0, 0.0f);
+        transferFunction->addAlphaPoint(0.0f, 40);
+        transferFunction->addAlphaPoint(0.8f, 47);
+        transferFunction->addAlphaPoint(1.0f, 55);
+        transferFunction->addStylePoint(StylePoint(56, addStyle("foliage")));
+        transferFunction->addStylePoint(StylePoint(110, addStyle("wood")));
+        // the trunk and the soil share densities, the soil around 135 and its pebbles higher. The ceramic wall peaks around 210
+        transferFunction->addStylePoint(StylePoint(150, addStyle("soil")));
+        transferFunction->addStylePoint(StylePoint(205, addStyle("ceramic")));
+        // the plate it stands on shares the leaves' densities
+        volume.cropMin = vec3(0.07f, 0.075f, 0.02f);
+        volume.cropMax = vec3(0.92f, 1, 1);
+        // the rims of the wood, soil and ceramic pass through the leaves' densities
+        volume.styleLookahead = 2.0f;
+    }
+    else if (preset == "aneurism")
+    {
+        transferFunction->setThreshold(40, 255);
+        transferFunction->setAlpha(0, 0.0f);
+        transferFunction->addAlphaPoint(0.0f, 50);
+        transferFunction->addAlphaPoint(0.9f, 110);
+        transferFunction->addStylePoint(StylePoint(100, addStyle("vessel")));
+    }
+    else if (preset == "engine")
+    {
+        // a solid steel block, the dense brass parts show where it is cut
+        transferFunction->setThreshold(100, 255);
+        transferFunction->setAlpha(0, 0.0f);
+        transferFunction->addAlphaPoint(0.0f, 100);
+        transferFunction->addAlphaPoint(0.85f, 120);
+        transferFunction->addAlphaPoint(0.4f, 138);
+        transferFunction->addAlphaPoint(0.0f, 170);
+        transferFunction->addAlphaPoint(0.9f, 200);
+        transferFunction->addStylePoint(StylePoint(155, addStyle("steel")));
+        transferFunction->addStylePoint(StylePoint(205, addStyle("brass")));
+        // the face of the brass parts passes through the steel's densities
+        volume.styleLookahead = 2.0f;
+        volume.setRotation(angleAxis(radians(-90.0f), vec3(1, 0, 0)));
     }
     else if (preset == "skull")
     {
@@ -179,8 +223,6 @@ void Harness::applyPreset(RaycastVolume& volume)
         transferFunction->setAlpha(0, 0.0f);
         transferFunction->addAlphaPoint(0.0f, 50);
         transferFunction->addAlphaPoint(0.6f, 95);
-        transferFunction->addColorPoint(vec3(0.75f, 0.55f, 0.40f), 55);
-        transferFunction->addColorPoint(vec3(1.0f, 0.97f, 0.9f), 110);
         transferFunction->addStylePoint(StylePoint(100, addStyle("bone")));
         volume.setRotation(angleAxis(radians(-90.0f), vec3(1, 0, 0)));
     }
@@ -194,8 +236,6 @@ void Harness::applyPreset(RaycastVolume& volume)
         transferFunction->addAlphaPoint(0.0f, 75);
         transferFunction->addAlphaPoint(0.0f, 95);
         transferFunction->addAlphaPoint(0.8f, 125);
-        transferFunction->addColorPoint(vec3(0.95f, 0.70f, 0.55f), 55);
-        transferFunction->addColorPoint(vec3(1.0f, 0.97f, 0.9f), 120);
         transferFunction->addStylePoint(StylePoint(55, addStyle("skin")));
         transferFunction->addStylePoint(StylePoint(120, addStyle("bone")));
         volume.setRotation(angleAxis(radians(90.0f), vec3(0, 1, 0)));
@@ -215,8 +255,9 @@ void Harness::start(RaycastVolume& volume, CameraPersp& camera)
 
     if (!preset.empty() && volumePath.empty())
     {
-        volumePath = findFile("volumes/" + preset + "_256x256x256_uint8.raw");
-        dims = ivec3(256);
+        dims = preset == "engine" ? ivec3(256, 256, 128) : ivec3(256);
+        volumePath = findFile("volumes/" + preset + "_" + std::to_string(dims.x) + "x" + std::to_string(dims.y) + "x" +
+                              std::to_string(dims.z) + "_uint8.raw");
     }
 
     if (!volumePath.empty())
@@ -229,6 +270,12 @@ void Harness::start(RaycastVolume& volume, CameraPersp& camera)
     volume.debugView = debugView;
 
     if (threshold.y > 0 && volume.getTransferFunction()) volume.getTransferFunction()->setThreshold(threshold.x, threshold.y);
+
+    if (hasCrop)
+    {
+        volume.cropMin = cropMin;
+        volume.cropMax = cropMax;
+    }
 
     if (hasRotation)
     {
@@ -249,7 +296,11 @@ void Harness::start(RaycastVolume& volume, CameraPersp& camera)
     if (!hasCamera && !preset.empty())
     {
         // framing of each bundled volume
-        cameraOrbit = preset == "bonsai" ? vec3(30, 15, 2.4f) : preset == "skull" ? vec3(-60, 10, 2.8f) : vec3(-20, 40, 2.6f);
+        cameraOrbit = preset == "bonsai"     ? vec3(30, 5, 2.0f)
+                      : preset == "skull"    ? vec3(-60, 10, 2.8f)
+                      : preset == "foot"     ? vec3(-20, 40, 2.6f)
+                      : preset == "aneurism" ? vec3(20, 15, 1.8f)
+                                             : vec3(35, 30, 1.9f);
         hasCamera = true;
     }
 

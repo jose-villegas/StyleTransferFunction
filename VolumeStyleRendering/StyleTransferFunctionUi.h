@@ -13,6 +13,10 @@ public:
     ~StyleTransferFunctionUi();
 
     const std::shared_ptr<StyleTransferFunction> &getTranferFunction() const;
+    // point type the editor adds and lists: 0 alpha, 1 color, 2 style
+    static int PointType;
+    // opens the point list on the first frame
+    static bool OpenPointList;
 private:
     std::vector<std::pair<std::string, ci::Json>> savedTransferFunctions;
     std::shared_ptr<StyleTransferFunction> transferFunction;

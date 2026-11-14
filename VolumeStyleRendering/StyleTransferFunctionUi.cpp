@@ -501,8 +501,13 @@ void StyleTransferFunctionUi::drawStylePointList() const
     }
 }
 
+int StyleTransferFunctionUi::PointType = 0;
+bool StyleTransferFunctionUi::OpenPointList = false;
+
 void StyleTransferFunctionUi::drawControlPointList(int pointType) const
 {
+    if (OpenPointList) ui::SetNextTreeNodeOpen(true, ImGuiSetCond_Once);
+
     // draw control point list
     if (pointType == 0 ? ui::TreeNode("Alpha Points")
             : pointType == 1 ? ui::TreeNode("Color Points")
@@ -611,7 +616,7 @@ void StyleTransferFunctionUi::drawTransferFunctionsManager()
 void StyleTransferFunctionUi::drawControlPointCreationUi()
 {
     // creation bar
-    static int pointType = 0;
+    int& pointType = PointType;
     static int isoValue = 127;
     static float alpha;
     static vec3 color;

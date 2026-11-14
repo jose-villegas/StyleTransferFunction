@@ -141,6 +141,12 @@ public:
     bool hasVolume() const { return isDrawable; }
     // shows an intermediate render target instead of the result: 1 front, 2 back, 3 color, 4 normal, 5 position
     int debugView = 0;
+    // samples outside this box, in texture coordinates, are skipped
+    glm::vec3 cropMin{0.0f};
+    glm::vec3 cropMax{1.0f};
+    // voxels behind a boundary the style is looked up at, so the edge of a dense material
+    // never takes the style of a thinner one its density passes through. 0 turns it off
+    float styleLookahead = 0.0f;
 private:
     // histogram data
     std::array<float, 256> histogram;
