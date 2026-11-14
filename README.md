@@ -43,21 +43,21 @@ Volumetric lighting computes light inside the volume, so whatever stands in fron
 
 Two 3D textures, built by compute shaders at half the volume resolution by default:
 
-- **Light volume.** Transmittance toward the directional light, marched from every voxel through the classified
-  volume:
+**Light volume.** Transmittance toward the directional light, marched from every voxel through the classified
+volume:
 
-  ```math
-  T_l(\mathbf{x}) = \prod_i \left(1 - \alpha(\mathbf{x} + i\,\Delta\mathbf{l})\right)
-  ```
+```math
+T_l(\mathbf{x}) = \prod_i \left(1 - \alpha(\mathbf{x} + i\,\Delta\mathbf{l})\right)
+```
 
-- **Ambient volume.** Every voxel marches 16 short rays (Fibonacci sphere directions, 12 voxels long by default).
-  The fraction of rays that escape is the ambient visibility $`V`$. The material each ray runs into, lit by the light
-  volume, is reflected back as one bounce of indirect light $`E`$:
+**Ambient volume.** Every voxel marches 16 short rays (Fibonacci sphere directions, 12 voxels long by default).
+The fraction of rays that escape is the ambient visibility $`V`$. The material each ray runs into, lit by the light
+volume, is reflected back as one bounce of indirect light $`E`$:
 
-  ```math
-  V(\mathbf{x}) = \frac{1}{16} \sum_{d=1}^{16} T_d, \qquad
-  E(\mathbf{x}) = \frac{1}{16} \sum_{d=1}^{16} \sum_i T_{d,i}\, \alpha_i\, \mathbf{c}_i\, T_l(\mathbf{x}_i)
-  ```
+```math
+V(\mathbf{x}) = \frac{1}{16} \sum_{d=1}^{16} T_d, \qquad
+E(\mathbf{x}) = \frac{1}{16} \sum_{d=1}^{16} \sum_i T_{d,i}\, \alpha_i\, \mathbf{c}_i\, T_l(\mathbf{x}_i)
+```
 
 Each sample along a view ray then combines them with its style color $`\mathbf{c}`$:
 
