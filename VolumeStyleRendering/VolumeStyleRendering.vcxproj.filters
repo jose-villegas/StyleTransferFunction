@@ -42,6 +42,9 @@
     <ClCompile Include="Postprocess.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Harness.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="VolumeRenderingAppUi.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -66,6 +69,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="RaycastVolume.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Harness.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Light.h">
@@ -117,6 +123,8 @@
     <None Include="assets\shaders\multiply.frag" />
     <None Include="assets\shaders\inverse.frag" />
     <None Include="assets\shaders\average.frag" />
+    <None Include="assets\shaders\light_volume.comp" />
+    <None Include="assets\shaders\ambient_volume.comp" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="images\noise.png">

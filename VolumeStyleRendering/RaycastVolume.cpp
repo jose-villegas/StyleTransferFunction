@@ -1,5 +1,6 @@
 #include <cinder/app/AppBase.h>
 #include <cinder/Log.h>
+#include <chrono>
 
 #include "RaycastVolume.h"
 #include "StyleTransferFunction.h"
@@ -28,6 +29,11 @@ RaycastVolume::RaycastVolume() : aspectRatios(1), scaleFactor(vec3(1)), stepScal
         .compute(loadAsset("shaders/gradients.comp")));
     smoothGradientsCompute = gl::GlslProg::create(gl::GlslProg::Format()
         .compute(loadAsset("shaders/smooth_gradients.comp")));
+    // volumetric lighting
+    lightVolumeCompute = gl::GlslProg::create(gl::GlslProg::Format()
+        .compute(loadAsset("shaders/light_volume.comp")));
+    ambientVolumeCompute = gl::GlslProg::create(gl::GlslProg::Format()
+        .compute(loadAsset("shaders/ambient_volume.comp")));
     // noise texture to reduce volume banding artifacts
     noiseTexture = gl::Texture2d::create(loadImage(loadAsset("images/noise.png")), gl::Texture2d::Format()
                                          .wrapS(GL_REPEAT)
@@ -188,20 +194,23 @@ void RaycastVolume::loadFromFile(const vec3& dimensions, const vec3& ratios, con
     extractHistogram();
     // gradients
     generateGradients();
+    // lighting volumes are rebuilt on the next draw
+    volumeVersion++;
 }
 
 void RaycastVolume::drawCubeFaces() const
 {
     gl::ScopedDepth depth(true);
+    // positions are data, never blended
+    gl::ScopedBlend noBlend(false);
     // draw front face
     {
         gl::ScopedFramebuffer scopedFramebuffer(frontFbo);
         gl::ScopedViewport scopedViewport(ivec2(0), frontFbo->getSize());
         gl::ScopedFaceCulling faceCulling(true, GL_BACK);
-        // draw front face cube positions to render target 
+        // draw front face cube positions to render target
         gl::clear();
         positionsProg->bind();
-        positionsProg->uniform("renderingFront", true);
         gl::setDefaultShaderVars();
         gl::drawElements(gl::toGl(cubeMesh->getPrimitive()), cubeMesh->getNumIndices(),
                          GL_UNSIGNED_INT, static_cast<GLuint *>(nullptr));
@@ -237,10 +246,15 @@ void RaycastVolume::drawVolume(const Camera& camera)
         // draw cube positions
         drawCubeFaces();
 
+        const auto& volumetric = RenderingParams::Volumetric();
+
+        if (volumetric.enabled) updateLightingVolumes();
+
         // ray cast cube
         auto program = raycastShaderRendertargets;
         gl::ScopedGlslProg scopedProg(program);
-        gl::ScopedBlend blend(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        // the ray marcher writes premultiplied color and data targets, no blending
+        gl::ScopedBlend noBlend(false);
         gl::ScopedDepth depth(false);
 
         // bind  textures
@@ -254,6 +268,8 @@ void RaycastVolume::drawVolume(const Camera& camera)
         gl::ScopedTextureBind indexTex(transferFunction->getIndexFunctionTexture(), 7);
         gl::ScopedTextureBind styleTex(transferFunction->getStyleFunctionTexture(), 8);
         gl::ScopedTextureBind ambientOcclusionTex(volumeAO, 9);
+        gl::ScopedTextureBind lightVolumeTex(lightVolume ? lightVolume : volumeTexture, 10);
+        gl::ScopedTextureBind ambientVolumeTex(ambientVolume ? ambientVolume : volumeTexture, 11);
 
         // raycast parameters
         program->uniform("threshold", vec2(transferFunction->getThreshold()) / 255.0f);
@@ -269,6 +285,19 @@ void RaycastVolume::drawVolume(const Camera& camera)
         program->uniform("light.direction", light.direction);
         program->uniform("light.ambient", light.ambient);
         program->uniform("light.diffuse", light.diffuse);
+
+        // volumetric lighting
+        program->uniform("volumetricLighting", volumetric.enabled);
+        program->uniform("eyePosition", camera.getEyePoint());
+        program->uniform("lightOffset", lightDirectionInVolume() * float(volumetric.volumeDivisor) / maxSize);
+        program->uniform("gradientShading", volumetric.gradientShading);
+        program->uniform("ambientStrength", volumetric.ambientStrength);
+        program->uniform("specularStrength", volumetric.specularStrength);
+        program->uniform("shininess", volumetric.shininess);
+        program->uniform("volumetricShadows", volumetric.shadows && lightVolume != nullptr);
+        program->uniform("volumeOcclusion", volumetric.occlusion && ambientVolume != nullptr);
+        program->uniform("indirectLight", volumetric.indirect && ambientVolume != nullptr);
+        program->uniform("indirectStrength", volumetric.indirectStrength);
         gl::setDefaultShaderVars();
 
         // draw volume to render targets
@@ -294,7 +323,10 @@ void RaycastVolume::drawVolume(const Camera& camera)
     }
     // post-process
     {
-        // ambient occlusion
+        const bool classic = !RenderingParams::Volumetric().enabled;
+
+        // screen space ambient occlusion, classic lighting only
+        if (classic)
         {
             PostProcess::instance().SSAO(volumePosition, volumeNormal, camera);
             // write blurred result
@@ -313,8 +345,8 @@ void RaycastVolume::drawVolume(const Camera& camera)
             }
         }
 
-        // shadow mapping
-        if (RenderingParams::ShadowsEnabled())
+        // screen space shadows, classic lighting only
+        if (classic && RenderingParams::ShadowsEnabled())
         {
             // invert the shadow color map so shadower areas are black
             {
@@ -338,8 +370,13 @@ void RaycastVolume::drawVolume(const Camera& camera)
             PostProcess::instance().toneMapping(volumeColor);
         }
 
+        if (debugView > 0)
+        {
+            const gl::Texture2dRef views[] = {frontTexture, backTexture, volumeColor, volumeNormal, volumePosition, noiseTexture};
+            PostProcess::instance().displayTexture(views[min(debugView, 6) - 1]);
+        }
         // anti aliasing
-        if (RenderingParams::FXAAEnabled())
+        else if (RenderingParams::FXAAEnabled())
         {
             PostProcess::instance().displayFXAA();
         }
@@ -357,7 +394,7 @@ void RaycastVolume::resizeFbos()
                                                              .minFilter(GL_NEAREST)
                                                              .wrap(GL_REPEAT)
                                                              .dataType(GL_FLOAT);
-    gl::Texture2d::Format dataFormat = gl::Texture2d::Format().internalFormat(GL_RGB16F)
+    gl::Texture2d::Format dataFormat = gl::Texture2d::Format().internalFormat(GL_RGBA16F)
                                                               .magFilter(GL_NEAREST)
                                                               .minFilter(GL_NEAREST)
                                                               .wrap(GL_REPEAT)
@@ -454,30 +491,124 @@ void RaycastVolume::generateGradients()
 {
     auto format = gl::Texture3d::Format().magFilter(GL_LINEAR)
                                          .minFilter(GL_LINEAR)
-                                         .wrapS(GL_CLAMP_TO_BORDER)
-                                         .wrapR(GL_CLAMP_TO_BORDER)
-                                         .wrapT(GL_CLAMP_TO_BORDER)
-                                         .internalFormat(GL_RG16F);
+                                         .wrapS(GL_CLAMP_TO_EDGE)
+                                         .wrapR(GL_CLAMP_TO_EDGE)
+                                         .wrapT(GL_CLAMP_TO_EDGE)
+                                         .internalFormat(GL_RGBA16F);
     format.setDataType(GL_FLOAT);
     gradientTexture = gl::Texture3d::create(dimensions.x, dimensions.y, dimensions.z, format);
+    // the separable filter ping-pongs between the gradient texture and this one
+    auto scratch = gl::Texture3d::create(dimensions.x, dimensions.y, dimensions.z, format);
+    const ivec3 groups = ivec3(ceil(dimensions / 8.0f));
 
-    // compute gradients
+    // central difference gradients, unnormalized with their magnitude
     {
-        gradientsCompute->bind();
-        // pass textures
-        glBindImageTexture(0, volumeTexture->getId(), 0, true, 0, GL_READ_ONLY, GL_R8UI);
-        glBindImageTexture(1, gradientTexture->getId(), 0, true, 0, GL_WRITE_ONLY, GL_RG16F);
-        // compute gradients
-        gl::dispatchCompute(ceil(dimensions.x / 8), ceil(dimensions.y / 8), ceil(dimensions.z / 8));
+        gl::ScopedGlslProg scopedProg(gradientsCompute);
+        gl::ScopedTextureBind volumeTex(volumeTexture, 0);
+        gradientsCompute->uniform("spacing", aspectRatios);
+        glBindImageTexture(1, scratch->getId(), 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+        gl::dispatchCompute(groups.x, groups.y, groups.z);
+        gl::memoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     }
-    // smooth gradients
+    // smooth gradients, 5x5x5 binomial filter one axis at a time
     {
-        smoothGradientsCompute->bind();
-        // pass textures
-        glBindImageTexture(0, gradientTexture->getId(), 0, true, 0, GL_READ_WRITE, GL_RG16F);
-        // compute gradients
-        gl::dispatchCompute(ceil(dimensions.x / 8), ceil(dimensions.y / 8), ceil(dimensions.z / 8));
+        gl::ScopedGlslProg scopedProg(smoothGradientsCompute);
+        const gl::Texture3dRef passes[3][2] =
+        {
+            {scratch, gradientTexture},
+            {gradientTexture, scratch},
+            {scratch, gradientTexture}
+        };
+
+        for (int axis = 0; axis < 3; axis++)
+        {
+            ivec3 direction(0);
+            direction[axis] = 1;
+            gl::ScopedTextureBind sourceTex(passes[axis][0], 0);
+            smoothGradientsCompute->uniform("axis", direction);
+            glBindImageTexture(1, passes[axis][1]->getId(), 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+            gl::dispatchCompute(groups.x, groups.y, groups.z);
+            gl::memoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        }
     }
+}
+
+vec3 RaycastVolume::lightDirectionInVolume() const
+{
+    // the model matrix is rotation * translation * scale, directions only see rotation and scale
+    const vec3 toLight = normalize(-light.direction);
+    return normalize((inverse(modelRotation) * toLight) / scaleFactor);
+}
+
+void RaycastVolume::updateLightingVolumes()
+{
+    const auto& settings = RenderingParams::Volumetric();
+    LightingState state;
+    state.volume = volumeVersion;
+    state.transferFunction = transferFunction->getVersion();
+    state.threshold = transferFunction->getThreshold();
+    state.lightDirection = lightDirectionInVolume();
+    state.divisor = max(settings.volumeDivisor, 1);
+    state.occlusionRadius = settings.occlusionRadius;
+    state.occlusion = settings.occlusion;
+    state.indirect = settings.indirect;
+
+    // the light volume is always built, it feeds both shadows and indirect light
+    if (state == lightingState && lightVolume) return;
+
+    glFinish();
+    const auto start = std::chrono::high_resolution_clock::now();
+    const ivec3 size = max(ivec3(1), (ivec3(dimensions) + state.divisor - 1) / state.divisor);
+    const ivec3 groups = (size + 7) / 8;
+
+    if (!lightVolume || lightVolume->getWidth() != size.x || lightVolume->getHeight() != size.y ||
+        lightVolume->getDepth() != size.z)
+    {
+        auto format = gl::Texture3d::Format().magFilter(GL_LINEAR)
+                                             .minFilter(GL_LINEAR)
+                                             .wrapS(GL_CLAMP_TO_EDGE)
+                                             .wrapR(GL_CLAMP_TO_EDGE)
+                                             .wrapT(GL_CLAMP_TO_EDGE);
+        format.setDataType(GL_FLOAT);
+        lightVolume = gl::Texture3d::create(size.x, size.y, size.z, format.internalFormat(GL_R16F));
+        ambientVolume = gl::Texture3d::create(size.x, size.y, size.z, format.internalFormat(GL_RGBA16F));
+    }
+
+    const vec2 threshold = vec2(state.threshold) / 255.0f;
+    gl::ScopedTextureBind volumeTex(volumeTexture, 0);
+    gl::ScopedTextureBind colorTex(transferFunction->getColorMappingTexture(), 1);
+
+    // transmittance toward the light, one light volume voxel per step
+    {
+        const float stepVoxels = static_cast<float>(state.divisor);
+        gl::ScopedGlslProg scopedProg(lightVolumeCompute);
+        lightVolumeCompute->uniform("threshold", threshold);
+        lightVolumeCompute->uniform("lightStep", state.lightDirection * stepVoxels / maxSize);
+        lightVolumeCompute->uniform("opacityExponent", stepVoxels / 0.5f);
+        lightVolumeCompute->uniform("maxSteps", static_cast<int>(ceil(1.7321f * maxSize / stepVoxels)) + 1);
+        glBindImageTexture(0, lightVolume->getId(), 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R16F);
+        gl::dispatchCompute(groups.x, groups.y, groups.z);
+        gl::memoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    }
+
+    // ambient occlusion and one bounce of indirect light
+    if (state.occlusion || state.indirect)
+    {
+        gl::ScopedGlslProg scopedProg(ambientVolumeCompute);
+        gl::ScopedTextureBind lightTex(lightVolume, 2);
+        ambientVolumeCompute->uniform("threshold", threshold);
+        ambientVolumeCompute->uniform("voxelSize", 1.0f / maxSize);
+        ambientVolumeCompute->uniform("radius", state.occlusionRadius);
+        ambientVolumeCompute->uniform("steps", 6);
+        ambientVolumeCompute->uniform("indirect", state.indirect);
+        glBindImageTexture(0, ambientVolume->getId(), 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+        gl::dispatchCompute(groups.x, groups.y, groups.z);
+        gl::memoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    }
+
+    glFinish();
+    lightingUpdateTime = std::chrono::duration<float, std::milli>(std::chrono::high_resolution_clock::now() - start).count();
+    lightingState = state;
 }
 
 const std::array<float, 256>& RaycastVolume::getHistogram() const

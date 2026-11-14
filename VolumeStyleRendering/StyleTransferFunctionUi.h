@@ -14,12 +14,12 @@ public:
 
     const std::shared_ptr<StyleTransferFunction> &getTranferFunction() const;
 private:
-    std::vector<std::pair<std::string, ci::JsonTree>> savedTransferFunctions;
+    std::vector<std::pair<std::string, ci::Json>> savedTransferFunctions;
     std::shared_ptr<StyleTransferFunction> transferFunction;
     bool showTFManager;
     void drawHistogram(const RaycastVolume& volume) const;
-    ci::JsonTree buildTransferFunctionJSON() const;
-    void loadTransferFunctionJSON(const cinder::JsonTree& second) const;
+    ci::Json buildTransferFunctionJSON() const;
+    void loadTransferFunctionJSON(const ci::Json& second) const;
 
     int stylesManagerPopup() const;
     void drawThresholdControl() const;

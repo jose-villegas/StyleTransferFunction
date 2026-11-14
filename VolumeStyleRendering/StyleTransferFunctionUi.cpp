@@ -49,6 +49,8 @@ void StyleTransferFunctionUi::drawUi(bool& open, const RaycastVolume& volume)
 {
     if (open)
     {
+        ui::SetNextWindowPos(ImVec2(20, 40), ImGuiSetCond_FirstUseEver);
+
         if(!ui::Begin("Transfer Function", &open, ImGuiWindowFlags_AlwaysAutoResize))
         {
             ui::End();
@@ -65,88 +67,75 @@ void StyleTransferFunctionUi::drawUi(bool& open, const RaycastVolume& volume)
     drawTransferFunctionsManager();
 }
 
-JsonTree StyleTransferFunctionUi::buildTransferFunctionJSON() const
+Json StyleTransferFunctionUi::buildTransferFunctionJSON() const
 {
-    JsonTree functionJson;
-    functionJson.addChild(JsonTree("threshold", "")
-        .addChild(JsonTree("x", transferFunction->getThreshold().x))
-        .addChild(JsonTree("y", transferFunction->getThreshold().y)));
+    Json functionJson;
+    functionJson["threshold"] = {{"x", transferFunction->getThreshold().x}, {"y", transferFunction->getThreshold().y}};
 
-    auto jAlphaP = JsonTree::makeArray("alpha_points");
+    auto jAlphaP = Json::array();
 
     for (auto& p : transferFunction->getAlphaPoints())
     {
-        JsonTree aPoint;
-        aPoint.addChild(JsonTree("iso_value", p.getIsoValue()))
-              .addChild(JsonTree("alpha", p.getAlpha()));
-        jAlphaP.addChild(aPoint);
+        jAlphaP.push_back({{"iso_value", p.getIsoValue()}, {"alpha", p.getAlpha()}});
     }
 
-    functionJson.addChild(jAlphaP);
-    auto jColorP = JsonTree::makeArray("color_points");
+    functionJson["alpha_points"] = jAlphaP;
+    auto jColorP = Json::array();
 
     for (auto& p : transferFunction->getColorPoints())
     {
         auto& color = p.getColor();
-        JsonTree cPoint;
-        cPoint.addChild(JsonTree("iso_value", p.getIsoValue()));
-        cPoint.addChild(JsonTree::makeArray("color")
-            .addChild(JsonTree("", color.x))
-            .addChild(JsonTree("", color.y))
-            .addChild(JsonTree("", color.z)));
-        jColorP.addChild(cPoint);
+        jColorP.push_back({{"iso_value", p.getIsoValue()}, {"color", {color.x, color.y, color.z}}});
     }
 
-    functionJson.addChild(jColorP);
-    auto jStyleP = JsonTree::makeArray("style_points");
+    functionJson["color_points"] = jColorP;
+    auto jStyleP = Json::array();
 
     for (auto& p : transferFunction->getStylePoints())
     {
-        JsonTree sPoint;
-        sPoint.addChild(JsonTree("iso_value", p.getIsoValue()))
-              .addChild(JsonTree("style", "")
-              .addChild(JsonTree("path", p.getStyle().getFilepath()))
-              .addChild(JsonTree("name", p.getStyle().getName())));
-        jStyleP.addChild(sPoint);
+        jStyleP.push_back({
+            {"iso_value", p.getIsoValue()},
+            {"style", {{"path", p.getStyle().getFilepath()}, {"name", p.getStyle().getName()}}}
+        });
     }
 
-    functionJson.addChild(jStyleP);
+    functionJson["style_points"] = jStyleP;
 
     return functionJson;
 }
 
-void StyleTransferFunctionUi::loadTransferFunctionJSON(const JsonTree& second) const
+void StyleTransferFunctionUi::loadTransferFunctionJSON(const Json& second) const
 {
-    transferFunction->setThreshold(second["threshold"]["x"].getValue<int>(),
-                                   second["threshold"]["y"].getValue<int>());
+    transferFunction->setThreshold(second["threshold"]["x"].get<int>(),
+                                   second["threshold"]["y"].get<int>());
 
     // clear the transfer function control points
     transferFunction->reset();
 
-    for (auto& aP : second["alpha_points"].getChildren())
+    for (auto& aP : second["alpha_points"])
     {
-        int isoVal = aP["iso_value"].getValue<int>();
+        int isoVal = aP["iso_value"].get<int>();
 
         if (isoVal > 0 && isoVal < 256)
         {
-            transferFunction->addAlphaPoint(aP["alpha"].getValue<float>(), isoVal);
+            transferFunction->addAlphaPoint(aP["alpha"].get<float>(), isoVal);
         }
         else
         {
             transferFunction->setAlpha(isoVal == 0 ? 0 : transferFunction->getAlphaPoints().size() - 1,
-                                       aP["alpha"].getValue<float>());
+                                       aP["alpha"].get<float>());
         }
     }
 
-    for (auto& cP : second["color_points"].getChildren())
+    for (auto& cP : second["color_points"])
     {
         vec3 color;
         int i = 0;
-        int isoVal = cP["iso_value"].getValue<int>();
+        int isoVal = cP["iso_value"].get<int>();
 
-        for (auto& c : cP["color"].getChildren())
+        for (auto& c : cP["color"])
         {
-            color[i++] = c.getValue<float>();
+            color[i++] = c.get<float>();
         }
 
         if (isoVal > 0 && isoVal < 256)
@@ -162,11 +151,11 @@ void StyleTransferFunctionUi::loadTransferFunctionJSON(const JsonTree& second) c
 
     auto& styles = Style::GetAvailableStyles();
 
-    for (auto& sP : second["style_points"].getChildren())
+    for (auto& sP : second["style_points"])
     {
-        auto isoVal = sP["iso_value"].getValue<int>();
-        auto name = sP["style"]["name"].getValue();
-        auto path = sP["style"]["path"].getValue();
+        auto isoVal = sP["iso_value"].get<int>();
+        auto name = sP["style"]["name"].get<std::string>();
+        auto path = sP["style"]["path"].get<std::string>();
         auto styleIndex = -1;
 
         auto sourceRef = loadImage(path);
@@ -594,7 +583,7 @@ void StyleTransferFunctionUi::drawTransferFunctionsManager()
             {
                 if (!fsPath.has_extension()) fsPath += ".stf";
 
-                buildTransferFunctionJSON().write(fsPath);
+                writeJson(fsPath, buildTransferFunctionJSON());
             }
         }
 
@@ -607,7 +596,7 @@ void StyleTransferFunctionUi::drawTransferFunctionsManager()
 
             if (!fsPath.empty())
             {
-                savedTransferFunctions.push_back({fsPath.filename().string(), JsonTree(loadFile(fsPath))});
+                savedTransferFunctions.push_back({fsPath.filename().string(), loadJson(loadFile(fsPath))});
                 loadTransferFunctionJSON(savedTransferFunctions.back().second);
                 selectedIndex = savedTransferFunctions.size() - 1;
             }
@@ -685,8 +674,8 @@ void StyleTransferFunctionUi::drawControlPointCreationUi()
 
     if (ui::Button("Add Point", ImVec2(ui::GetContentRegionAvailWidth(), 0)))
     {
-        pointType == 0 ? transferFunction->addAlphaPoint(alpha, isoValue)
-            : pointType == 1 ? transferFunction->addColorPoint(color, isoValue) : 0;
+        if (pointType == 0) { transferFunction->addAlphaPoint(alpha, isoValue); }
+        else if (pointType == 1) { transferFunction->addColorPoint(color, isoValue); }
 
         if (pointType == 2 && stylePoint.getStyleIndex() >= 0) { transferFunction->addStylePoint(stylePoint); }
     }

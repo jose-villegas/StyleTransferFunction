@@ -160,6 +160,7 @@ void TransferFunction::updateFunction()
 
     // update texture needs to be update on next query
     updateColorTexture = true;
+    version++;
 }
 
 const std::vector<TransferFunctionColorPoint> &TransferFunction::getColorPoints() const
@@ -193,7 +194,7 @@ const gl::Texture1dRef& TransferFunction::getColorMappingTexture()
     else if(updateColorTexture)
     {
         colorMappingTexture->update(getIndexedTransferFunction().data(), GL_RGBA, GL_FLOAT, 0, 256, 0);
-        updateColorTexture = true;
+        updateColorTexture = false;
     }
 
     return colorMappingTexture;
