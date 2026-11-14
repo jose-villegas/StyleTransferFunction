@@ -29,6 +29,10 @@ public:
     const std::vector<TransferFunctionAlphaPoint> &getAlphaPoints() const;
     const std::array<glm::vec4, 256> &getIndexedTransferFunction() const;
     const cinder::gl::Texture1dRef &getColorMappingTexture();
+    /**
+     * \brief Increases every time the color or opacity mapping changes
+     */
+    unsigned getVersion() const { return version; }
 private:
     glm::ivec2 threshold;
     std::vector<TransferFunctionColorPoint> colorPoints;
@@ -37,6 +41,7 @@ private:
     std::vector<CubicSpline> colorSpline;
     std::array<glm::vec4, 256> indexedTransferFunction;
     bool updateColorTexture;
+    unsigned version = 0;
 
     cinder::gl::Texture1dRef colorMappingTexture;
 };

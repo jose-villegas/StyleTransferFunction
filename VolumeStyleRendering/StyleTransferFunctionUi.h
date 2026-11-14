@@ -13,13 +13,17 @@ public:
     ~StyleTransferFunctionUi();
 
     const std::shared_ptr<StyleTransferFunction> &getTranferFunction() const;
+    // point type the editor adds and lists: 0 alpha, 1 color, 2 style
+    static int PointType;
+    // opens the point list on the first frame
+    static bool OpenPointList;
 private:
-    std::vector<std::pair<std::string, ci::JsonTree>> savedTransferFunctions;
+    std::vector<std::pair<std::string, ci::Json>> savedTransferFunctions;
     std::shared_ptr<StyleTransferFunction> transferFunction;
     bool showTFManager;
     void drawHistogram(const RaycastVolume& volume) const;
-    ci::JsonTree buildTransferFunctionJSON() const;
-    void loadTransferFunctionJSON(const cinder::JsonTree& second) const;
+    ci::Json buildTransferFunctionJSON() const;
+    void loadTransferFunctionJSON(const ci::Json& second) const;
 
     int stylesManagerPopup() const;
     void drawThresholdControl() const;

@@ -14,6 +14,12 @@ float RenderingParams::ssaoBias = 0.025f;
 float RenderingParams::ssaoRadius = 0.5f;
 float RenderingParams::ssaoPower = 1.0f;
 
+VolumetricLighting& RenderingParams::Volumetric()
+{
+    static VolumetricLighting settings;
+    return settings;
+}
+
 float RenderingParams::GetExposure() 
 {
     return exposureValue;

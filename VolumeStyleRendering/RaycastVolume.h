@@ -127,6 +127,26 @@ public:
      * \return The depth output render target  
      */
     const cinder::gl::Texture2dRef &getDepthTexture() const;
+    /**
+     * \brief The transfer function used to classify the volume
+     */
+    const std::shared_ptr<StyleTransferFunction> &getTransferFunction() const { return transferFunction; }
+    /**
+     * \brief Time in milliseconds the last rebuild of the lighting volumes took
+     */
+    float getLightingUpdateTime() const { return lightingUpdateTime; }
+    /**
+     * \brief Whether a volume has been loaded
+     */
+    bool hasVolume() const { return isDrawable; }
+    // shows an intermediate render target instead of the result: 1 front, 2 back, 3 color, 4 normal, 5 position
+    int debugView = 0;
+    // samples outside this box, in texture coordinates, are skipped
+    glm::vec3 cropMin{0.0f};
+    glm::vec3 cropMax{1.0f};
+    // voxels behind a boundary the style is looked up at, so the edge of a dense material
+    // never takes the style of a thinner one its density passes through. 0 turns it off
+    float styleLookahead = 0.0f;
 private:
     // histogram data
     std::array<float, 256> histogram;
@@ -161,6 +181,28 @@ private:
     ci::gl::GlslProgRef histogramCompute;
     ci::gl::GlslProgRef gradientsCompute;
     ci::gl::GlslProgRef smoothGradientsCompute;
+    ci::gl::GlslProgRef lightVolumeCompute;
+    ci::gl::GlslProgRef ambientVolumeCompute;
+
+    // volumetric lighting, rebuilt when any of the state they were built with changes
+    struct LightingState
+    {
+        unsigned volume = 0;
+        unsigned transferFunction = 0;
+        glm::ivec2 threshold{-1};
+        glm::vec3 lightDirection{0};
+        int divisor = 0;
+        float occlusionRadius = 0;
+        bool occlusion = false;
+        bool indirect = false;
+
+        bool operator==(const LightingState& other) const = default;
+    };
+    LightingState lightingState;
+    ci::gl::Texture3dRef lightVolume;
+    ci::gl::Texture3dRef ambientVolume;
+    unsigned volumeVersion = 0;
+    float lightingUpdateTime = 0.0f;
 
     // render targets
     ci::gl::Texture2dRef frontTexture;
@@ -182,7 +224,7 @@ private:
     float maxSize;
 
     // model
-    bool isDrawable;
+    bool isDrawable = false;
     glm::quat modelRotation;
     glm::vec3 modelPosition;
 
@@ -214,4 +256,12 @@ private:
      * a 3x3x3 average filter
      */
     void generateGradients();
+    /**
+     * \brief Direction toward the light in the volume's texture space
+     */
+    glm::vec3 lightDirectionInVolume() const;
+    /**
+     * \brief Rebuilds the light transmittance and ambient volumes when their inputs change
+     */
+    void updateLightingVolumes();
 };

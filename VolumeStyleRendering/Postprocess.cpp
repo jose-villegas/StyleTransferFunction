@@ -15,6 +15,7 @@ void PostProcess::displayTexture(const gl::Texture2dRef colorTex) const
     const gl::ScopedViewport scopedViewport(ivec2(0), toPixels(getWindowSize()));
     const gl::ScopedMatrices scopedMatrices;
     const gl::ScopedDepth depth(false);
+    const gl::ScopedBlend noBlend(false);
     gl::clear();
 
     // translate to center and scale to fit whole screen
@@ -31,6 +32,7 @@ void PostProcess::displayFXAA(const gl::Texture2dRef& texture) const
     const gl::ScopedViewport scopedViewport(ivec2(0), toPixels(getWindowSize()));
     const gl::ScopedMatrices scopedMatrices;
     const gl::ScopedDepth depth(false);
+    const gl::ScopedBlend noBlend(false);
     gl::clear();
 
     // custom uniforms
@@ -172,6 +174,7 @@ void PostProcess::Start()
     gl::context()->pushViewport({ivec2(0), instance().currentFbo->getSize()});
     gl::pushMatrices();
     gl::context()->pushBoolState(GL_DEPTH_TEST, false);
+    gl::context()->pushBoolState(GL_BLEND, false);
     gl::context()->pushDepthMask(false);
     gl::clear();
 
@@ -186,6 +189,7 @@ void PostProcess::End()
     gl::context()->popViewport();
     gl::popMatrices();
     gl::context()->popBoolState(GL_DEPTH_TEST);
+    gl::context()->popBoolState(GL_BLEND);
     gl::context()->popDepthMask();
 
     // swap current fbo for write
@@ -201,7 +205,7 @@ const gl::Texture2dRef& PostProcess::getColorTexture() const
 void PostProcess::resizeFbos()
 {
     // temporal accumulated texture
-    gl::Texture2d::Format colorAccFormat = gl::Texture2d::Format().internalFormat(GL_RGB16F)
+    gl::Texture2d::Format colorAccFormat = gl::Texture2d::Format().internalFormat(GL_RGBA16F)
                                                                   .magFilter(GL_NEAREST)
                                                                   .minFilter(GL_NEAREST)
                                                                   .wrap(GL_REPEAT);
